@@ -1,0 +1,32 @@
+[package]
+name = "syncode-core"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+name = "syncode_core"
+path = "src/lib.rs"
+
+
+[dependencies]
+regex = "1.11.1"
+regex-automata = "0.4.9"
+# candle-core = "0.9.1"
+# candle-transformers = "0.9.1"
+# tokenizers = { version = "0.21.0", features = ["http"] }
+# hf-hub = "0.4.2"
+
+# pyo3 = { version = "0.24.2", features = ["extension-module"] }
+
+[dev-dependencies]
+# For testing we need different features
+# pyo3 = { version = "0.24.2", features = ["auto-initialize"] }
+
+# This is the key part for testing PyO3 code
+[features]
+# Add a special feature for testing
+# extension-module = ["pyo3/extension-module"]
+# default = ["extension-module"]
+
+[profile.release]
+debug = true
