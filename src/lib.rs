@@ -11,17 +11,17 @@ returns a masker struct.
 
 That struct has a single public function that takes in an array of bytes, the
 model's generated output so far, and returns a mask, a boolean array, over the
-model's vocabulary. 
+model's vocabulary.
 
 Applying this mask to the model's vocabulary should, provided it was
 constructed with sufficient lookahead, prevent the model from ever going
 outside of the grammar.
- 
+
 !*/
-pub mod mask;
-pub mod parser;
-pub mod lexer;
-pub mod dfa;
+// pub mod dfa;
 pub mod grammar;
-pub mod table;
+// pub mod lexer;
+// pub mod mask;
+// pub mod parser;
+// pub mod table;
 pub mod types;

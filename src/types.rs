@@ -12,17 +12,43 @@ use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
-use std::{cell::LazyCell, sync::Arc};
+use std::{cell::LazyCell, rc::Rc};
+
+/// A symbol of the grammar is either a terminal or a nonterminal.
+///
+/// Each is identified by a unique number.
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub enum Symbol {
+    Terminal(usize),
+    NonTerminal(usize),
+}
+
+/// Convenience type bindings to make the definitions of grammars more readable.
+type Terminal = usize;
+type NonTerminal = usize;
+
+/// A grammar has four components.
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct Grammar {
+    /// The set of terminals that are in this grammar.
+    pub terminals: Vec<Terminal>,
+    /// The set of nonterminals that are active in this grammar.
+    pub nonterminals: Vec<NonTerminal>,
+    /// The first production; this one is the augmented one added to the grammar.
+    pub start_nonterminal: NonTerminal,
+    /// The productions that make up this grammar, including the start_production.
+    pub productions: Vec<(NonTerminal, Vec<Symbol>)>,
+}
 
 /// A lexical token, what the lexer breaks the input into.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
     /// The content of the token.
-    pub value: Arc<[u8]>,
+    pub value: Rc<[u8]>,
     /// The type of terminal that this is in the grammar. None if this token
     /// couldn't be lexed, which can happen in the case that this is the
     /// unlexable remainder.
-    pub terminal: Option<Terminal>,
+    pub terminal: Option<Symbol>,
     /// Where in the input the token begins.
     pub start_pos: usize,
     /// Where in the input the token ends.
@@ -35,29 +61,6 @@ pub struct Token {
     pub column: usize,
     /// The column of the input the token ends on.
     pub end_column: usize,
-}
-
-/// A terminal of the grammar.
-#[derive(Clone)]
-pub struct Terminal {
-    /// The name of this terminal in the grammar.
-    pub name: Arc<str>,
-    /// The regex describing this terminal.
-    pub pattern: Arc<str>,
-    /// The DFA that matches this terminal.
-    pub dfa: dense::DFA<Vec<u32>>,
-    /// This terminal's priority in lexing.
-    pub priority: i32,
-}
-
-/// A type alias for nonterminals of the grammar, purely for readability.
-pub type NonTerminal = Arc<str>;
-
-/// An enumeration for symbols of the grammar, to act as an algebraic union type of terminals and nonterminals.
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub enum Symbol {
-    Terminal(Terminal),
-    NonTerminal(NonTerminal),
 }
 
 /// A single production of the grammar.
@@ -76,17 +79,6 @@ pub struct Production {
 }
 
 /// A context-free grammar.
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct Grammar {
-    /// The set of symbols that are active in this grammar.
-    pub symbol_set: Vec<Symbol>,
-    /// The set of terminals that are in this grammar.
-    pub terminals: Vec<Terminal>,
-    /// The first production; this one is the augmented one added to the grammar.
-    pub start_production: Production,
-    /// The productions that make up this grammar, including the start_production.
-    pub productions: Vec<Production>,
-}
 
 /// An item of the item set for LR parsing.
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
