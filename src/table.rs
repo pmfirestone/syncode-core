@@ -319,6 +319,7 @@ mod tests {
     /// (4.55) from the Dragon Book 2e, section 4.7.2, p. 263.
     fn example_grammar() -> Grammar {
         Grammar {
+            terminals: vec![Terminal::new("c", "c", 0), Terminal::new("d", "d", 0)],
             symbol_set: vec![
                 Symbol::NonTerminal("S'".into()),
                 Symbol::NonTerminal("S".into()),
