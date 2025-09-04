@@ -11,7 +11,6 @@ use std::collections::HashSet;
 use std::iter::zip;
 use std::{collections::HashMap, vec::Vec};
 
-
 /// DFA mask store stores, for each possible position we could be at in
 /// matching each terminal, and for each possible accept sequence that could
 /// follow, the binary mask over the vocabulary that indicates the possible

@@ -4,10 +4,11 @@
 generation. It forces an LLM to generate sequences that satisfy a given LR
 grammar.
 !*/
-pub mod mask;
-pub mod parser;
-pub mod lexer;
-pub mod dfa;
+// pub mod desugar;
+// pub mod dfa;
 pub mod grammar;
-pub mod table;
+// pub mod lexer;
+// pub mod mask;
+// pub mod parser;
+// pub mod table;
 pub mod types;

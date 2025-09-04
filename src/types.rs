@@ -37,53 +37,74 @@ pub struct Token {
     pub end_column: usize,
 }
 
+/// A symbol of the grammar.
+///
+/// We implement this as a trait as a hacky way to get an algebraic union of
+/// the Terminal and NonTerminal types.
+pub trait Symbol {}
+
 /// A terminal of the grammar.
 #[derive(Clone)]
 pub struct Terminal {
     /// The name of this terminal in the grammar.
-    pub name: Arc<str>,
+    pub name: String,
     /// The regex describing this terminal.
-    pub pattern: Arc<str>,
+    pub pattern: String,
     /// The DFA that matches this terminal.
-    pub dfa: dense::DFA<Vec<u32>>,
+    pub dfa: Box<dense::DFA<Vec<u32>>>,
     /// This terminal's priority in lexing.
     pub priority: i32,
 }
 
-/// A type alias for nonterminals of the grammar, purely for readability.
-pub type NonTerminal = Arc<str>;
-
-/// An enumeration for symbols of the grammar, to act as an algebraic union type of terminals and nonterminals.
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub enum Symbol {
-    Terminal(Terminal),
-    NonTerminal(NonTerminal),
+/// A non-terminal of the grammar.
+#[derive(Clone)]
+pub struct NonTerminal {
+    /// The name of this nonterminal.
+    pub name: String,
 }
 
+impl Symbol for Terminal {}
+
+impl Symbol for NonTerminal {}
+
+// /// An enumeration for symbols of the grammar, to act as an algebraic union
+// /// type of terminals and nonterminals.
+// #[derive(Clone, Debug, Hash, Eq, PartialEq)]
+// pub enum Symbol {
+//     Terminal(String),
+//     NonTerminal(String),
+// }
+
 /// A single production of the grammar.
-///
-/// That this is exactly a single production, so productions that can go to
-/// more than one outcome have to be represented by more than one production in
-/// the grammar.
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Production {
     /// The left hand side of the production.
-    pub lhs: NonTerminal,
+    pub lhs: String,
     /// The right hand side of the production.
-    pub rhs: Vec<Symbol>,
-    /// The priority of this production. Used to resolve conflicts when constructing the table.
-    pub priority: i32,
+    pub rhs: Vec<String>,
+    // The priority of this production. Used to resolve conflicts when constructing the table.
+    // pub priority: i32,
 }
 
 /// A context-free grammar.
+///
+/// For now, distinguish between terminals and nonterminals by capitalization:
+/// nonterminals are lowercase and terminals are capitalized. This is highly
+/// limited: for one, not all characters have a case (languages such as Arabic,
+/// Hebrew, Chinese, Japanese, Korean lack case in their writing systems); for
+/// another, it imposes a silly formality on the user.
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Grammar {
     /// The set of symbols that are active in this grammar.
-    pub symbol_set: Vec<Symbol>,
-    /// The set of terminals that are in this grammar.
-    pub terminals: Vec<Terminal>,
-    /// The first production; this one is the augmented one added to the grammar.
-    pub start_production: Production,
+    pub symbol_set: Vec<String>,
+    /// The set of terminals that are in this grammar. Each terminal is itself
+    /// a production of the grammar, because the grammar will be put in with
+    /// regexes on the right-hand side of the definitions, including the
+    /// definitions of terminals, which can be in terms of other terminals or
+    /// regexes.
+    pub terminals: Vec<Production>,
+    /// The start symbol; this one is the augmented one added to the grammar.
+    pub start_symbol: String,
     /// The productions that make up this grammar, including the start_production.
     pub productions: Vec<Production>,
 }
@@ -116,7 +137,7 @@ pub enum Action {
 pub type ActionTable = HashMap<(usize, Terminal), Action>;
 
 /// A goto table is a map from a (state_id, nonterminal) pair to a state_id.
-pub type GotoTable = HashMap<(usize, NonTerminal), usize>;
+pub type GotoTable = HashMap<(usize, String), usize>;
 
 // Implementations.
 impl Terminal {
@@ -130,7 +151,7 @@ impl Terminal {
         Terminal {
             name: name.into(),
             pattern: pattern.into(),
-            dfa,
+            dfa: dfa.into(),
             priority,
         }
     }

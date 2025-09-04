@@ -1,5 +1,5 @@
 // src/dfa.rs
-/*! 
+/*!
 DFA helper functions. This module primarily exists to export
 `all_dfa_states`, which is used to construct the mask store.
 !*/
@@ -12,7 +12,6 @@ use regex_automata::{
 };
 
 use std::collections::VecDeque;
-
 
 /// Return all states of a dfa by breadth-first search. There exists a private
 /// method that returns an iterator over all states. The suggested alternative
