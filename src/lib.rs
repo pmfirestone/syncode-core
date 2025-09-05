@@ -19,7 +19,7 @@ outside of the grammar.
 
 !*/
 pub mod dfa;
-// pub mod grammar;
+pub mod grammar;
 pub mod lexer;
 pub mod mask;
 pub mod parser;

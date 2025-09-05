@@ -31,12 +31,10 @@ DFAs that can be indexed by the terminals' indices.
 
 4. Convert the members of the productions into their numerical indices rather than their string names and construct the Grammar struct that this module ultimately returns.
 !*/
-use std::collections::HashMap;
 
 use crate::types::*;
-use std::rc::Rc;
 use regex::Regex;
-use regex_automata::{dfa::dense::DFA, util::lazy::Lazy};
+use regex_automata::util::lazy::Lazy;
 
 enum Item {
     RULE,
@@ -70,19 +68,18 @@ struct EBNFParser {
     cur_rhs: Vec<String>,
     /// Currently parsing a rule, token, or statement?
     cur_parsing: Item,
-    /// Are we currently at the top level of a parse (or have we recurred to inner expansions?)
-    top_level: bool,
     /// A nonce value to use for generating unique new non-terminal names.
     nonce: usize,
 }
 
 /// The terminals of the grammar description language.
-
-const STRING: &str = r#"\".*?(?<!\)(\\)*?\"i?"#;
-const NL: &str = r"(\r?\n)+\s*";
-
 // Anchor these to the beginning of the string, because we will be using the regex
 // to pop the terminal off the beginning of the input.
+
+const STRING: &str = r#"^\".*?(?<!\)(\\)*?\"i?"#;
+const STRING_RE: Lazy<Regex> = Lazy::new(|| Regex::new(STRING).unwrap());
+const NL: &str = r"^(\r?\n)+\s*";
+const NL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NL).unwrap());
 const REGEXP: &str = r"/(?!/)(\/|\\|[^/])*?/[imslux]*";
 const REGEXP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(REGEXP).unwrap());
 const OP: &str = r"^[+*]|[?][a-z]";
@@ -95,14 +92,6 @@ const RULE: &str = r"!?[_?]?[a-z][_a-z0-9]*";
 const RULE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(RULE).unwrap());
 const TOKEN: &str = r"_?[A-Z][_A-Z0-9]*";
 const TOKEN_RE: Lazy<Regex> = Lazy::new(|| Regex::new(TOKEN).unwrap());
-
-/// A production with all the quantifiers and groupings and so on.
-struct SugaryProduction {
-    /// The nonterminal that generates this production.
-    lhs: String,
-    /// The symbols on the right hand side of the production.
-    rhs: Vec<String>
-}
 
 impl EBNFParser {
     fn new(input_string: &str, starting_rule_name: &str) -> Self {
@@ -120,6 +109,8 @@ impl EBNFParser {
             name_stack: vec![],
             cur_priority: 0,
             cur_rhs: vec![],
+            cur_parsing: Item::RULE,
+            nonce: 0,
         }
     }
     /// Parse input_string into a Grammar.
@@ -142,9 +133,9 @@ impl EBNFParser {
             self.consume_space();
             // item: rule | token
             if RULE_RE.is_match_at(&self.input_string, self.cur_pos) {
-		self.parse_rule();
+                self.parse_rule();
             } else if TOKEN_RE.is_match_at(&self.input_string, self.cur_pos) {
-		self.parse_token();
+                self.parse_token();
             } else {
                 self.report_parse_error("Invalid item.");
             }
@@ -162,10 +153,9 @@ impl EBNFParser {
         // We know there's a match because this method is only called after
         // we've already determined that the next thing is a rule.
         let rule_match = RULE_RE.find_at(&self.input_string, self.cur_pos).unwrap();
-
+        eprintln!("{:?}", rule_match);
         self.cur_parsing = Item::RULE;
-        self.cur_name = rule_match.as_str().into();
-        self.top_level = true;
+        self.name_stack.push(rule_match.as_str().into());
         self.consume(rule_match.len());
 
         self.consume_space();
@@ -182,16 +172,8 @@ impl EBNFParser {
 
         self.parse_expansions();
 
-        // self.cur_rule contains the lhs of the production.
-        // self.cur_rhs contains the rhs of the production.
-
-        self.grammar.productions.push(Production {
-            lhs: self.name_stack.last().unwrap().to_string(),
-            rhs: self.cur_rhs.clone(),
-        });
-
         // We are no longer parsing a rule.
-        self.cur_name = "".into();
+        self.name_stack.pop();
         self.cur_rhs = vec![];
         self.cur_priority = 0;
     }
@@ -289,8 +271,9 @@ impl EBNFParser {
     fn parse_expansions(&mut self) -> String {
         self.consume_space();
 
-	loop {
-	    let cur_alias = self.parse_alias();
+        loop {
+            let cur_alias = self.parse_alias();
+            eprintln!("{:?}", cur_alias);
             match self.cur_parsing {
                 Item::RULE => {
                     // Push a new production to the set of productions.
@@ -306,28 +289,28 @@ impl EBNFParser {
                     // regex: they can contain arbitrary EBNF statements on
                     // their right-hand side. The remainder of SynCode's logic
                     // assumes that terminals are each a single regex, an
-                    // requirement not enforced by Lark's syntax nor, by
-                    // extension, by this module.
-                    self.grammar.terminals.push(Production {
-                        lhs: self.name_stack.last().unwrap().to_string(),
-                        rhs: cur_alias,
-                    });
+                    // requirement not enforced by Lark's syntax.
+
+                    // self.grammar.terminals.push(Production {
+                    //     lhs: self.name_stack.last().unwrap().to_string(),
+                    //     rhs: cur_alias,
+                    // });
                 }
                 _ => {
                     // Shouldn't reach this except in case of syntax error in input.
                 }
             }
 
-	    // If there's another alias, parse it.
+            // If there's another alias, parse it.
             self.consume_space();
             if VBAR_RE.is_match_at(&self.input_string, self.cur_pos) {
                 self.consume_space();
                 self.parse_alias();
-		continue;
+                continue;
             } else {
-		break self.name_stack.last().unwrap().to_string();
-	    }
-	}
+                break self.name_stack.last().unwrap().to_string();
+            }
+        }
     }
 
     /// Parse an alias.
@@ -345,7 +328,7 @@ impl EBNFParser {
             // grammar. Just skip to the end of the line.
             self.consume_to_end_of_line();
         }
-	res
+        res
     }
 
     /// Parse an expansion.
@@ -354,12 +337,13 @@ impl EBNFParser {
     fn parse_expansion(&mut self) -> Vec<String> {
         // Naughty way to check whether we're still on the same line.
         let start_line = self.cur_line;
-	let mut res = vec![];
+        let mut res = vec![];
         while self.cur_line == start_line && self.cur_pos < self.input_string.len() {
             self.consume_space();
             res.push(self.parse_expression());
+            eprintln!("{:?}", res);
         }
-	res
+        res
     }
 
     /// Parse an expression.
@@ -369,7 +353,7 @@ impl EBNFParser {
     /// This level of the grammar separates the quantifiers from the thing they
     /// quantify.
     fn parse_expression(&mut self) -> String {
-        let new_atom = self.parse_atom();
+        let new_atom = self.parse_atom();	
         self.consume_space();
         if OP_RE.is_match_at(&self.input_string, self.cur_pos) {
             let new_nonterm = self.new_nonterminal("expression");
@@ -423,9 +407,9 @@ impl EBNFParser {
         //     self.consume_space();
         //     // self.handle_range();
         } else {
-	    // An unquantified atom.
-	    new_atom
-	}
+            // An unquantified atom.
+            new_atom
+        }
     }
 
     /// Parse an atom.
@@ -445,10 +429,10 @@ impl EBNFParser {
             let new_expansion = self.parse_expansions();
             if self.peek(0) == Some(')') {
                 self.consume(1);
-		return new_expansion;
+                return new_expansion;
             } else {
                 self.report_parse_error("Expected ')'.");
-		return new_expansion; // Panics in previous line, but 
+                return new_expansion; // Panics in previous line, but 
             }
         } else {
             self.parse_value()
@@ -466,17 +450,18 @@ impl EBNFParser {
     fn parse_value(&mut self) -> String {
         match self.peek(0) {
             Some('"') => {
-                // Could be a STRING or a STRING ".." STRING.  We need more
-                // than one token of lookahead here, so go to a special
-                // handler.
-                // self.handle_string_or_literal_range();
+                // TODO: Implement literal ranges.
+		let input_string = self.input_string.clone();
+                let Some(matched_string) = STRING_RE.find_at(&input_string, self.cur_pos)
+                else {
+                    self.report_parse_error("String never terminated");
+		    return "".to_string();
+                };
+		self.consume(matched_string.len());
+		return matched_string.as_str()[1..matched_string.as_str().len()].to_string();
             }
-            Some('/') => {
-                self.parse_regex();
-            }
-            _ => {
-                self.parse_name()
-            }
+            Some('/') => self.parse_regex(),
+            _ => self.parse_name(),
         }
     }
 
@@ -484,17 +469,18 @@ impl EBNFParser {
     ///
     /// `name: RULE | TOKEN`
     fn parse_name(&mut self) -> String {
+        let input_string = self.input_string.clone();
         if RULE_RE.is_match_at(&self.input_string, self.cur_pos) {
-            let rule_match = RULE_RE.find_at(&self.input_string, self.cur_pos).unwrap();
+            let rule_match = RULE_RE.find_at(&input_string, self.cur_pos).unwrap();
             self.consume(rule_match.len());
-	    return rule_match.as_str().into();
+            return rule_match.as_str().into();
         } else if TOKEN_RE.is_match_at(&self.input_string, self.cur_pos) {
-            let token_match = TOKEN_RE.find_at(&self.input_string, self.cur_pos).unwrap();
+            let token_match = TOKEN_RE.find_at(&input_string, self.cur_pos).unwrap();
             self.consume(token_match.len());
-	    return token_match.as_str().into();
+            return token_match.as_str().into();
         } else {
             self.report_parse_error("Expected a RULE or a TOKEN.");
-	    return "".into();
+            return "".into();
         }
     }
 
@@ -510,69 +496,17 @@ impl EBNFParser {
     /// in the rule. We make these anonymous terminals into terminals of the
     /// grammar and treat them as such.
     fn parse_regex(&mut self) -> String {
+        let input_string = self.input_string.clone();
         self.consume(1);
-        let Some(re_match) = REGEXP_RE.find_at(&self.input_string, self.cur_pos) else {
+        let Some(re_match) = REGEXP_RE.find_at(&input_string, self.cur_pos) else {
             self.report_parse_error("Failed to parse regular expression.");
-	    return "".into();
+            return "".into();
         };
         self.consume(re_match.len());
         // Eat the final slash.
         self.consume(1);
-	re_match.as_str().into()
+        re_match.as_str().into()
     }
-
-    // The quantifiers require their own special handling, because they create
-    // changes to the grammar.
-    // Options for handling:
-    //
-    // 1. Modify the grammar as a string before parsing it.
-    //
-    //    Pros: the resulting grammar can be easily parsed into the form needed
-    //    for creating an LR table.
-    //
-    //    Cons: string manipulations can be hellacious and easily break the
-    //    syntax of the grammar description language.
-    //
-    // 2. Modify the productions the grammar produces after parsing.
-    //
-    //    Pros: manipulating data structures is more reliable.
-    //
-    //    Cons: requires an intermediate representation for quantified
-    //    productions before they are turned into the productions used for the
-    //    grammar.
-    //
-    // The basic dichotomy is whether to handle the quantifiers before or after
-    // parsing the grammar file.
-
-    /// Handle the quantifiers ?, *, and +.
-    ///
-    /// `item?` - Zero or one instances of item (”maybe”).
-    ///
-    /// Expanded into an alternative between two results, one where the
-    /// quantified item is present and one where it is absent.
-    /// ```
-    /// a b? c   ->   a c | a b c
-    /// ```
-    ///
-    /// `item*` - Zero or more instances of item:
-    /// Extracted into recursion.
-    /// ```
-    /// a: b*     ->   a: _b_tag
-    ///                _b_tag: (_b_tag b)?
-    /// ```
-    ///
-    /// `item+` - One or more instances of item.
-    /// Extracted into recursion with one instance of the item prefaced to the top rule:
-    /// ```
-    /// a: b+     ->   a: b _b_tag
-    ///                _b_tag: (_b_tag b)?
-    /// ```
-    ///
-    /// These transformations must be applied repeatedly until the input
-    /// contains no more quantifiers. Since the * and + quantifiers introduce
-    /// new ? quantifiers, the *s and +s must be addressed first, then all the
-    /// ?s must be resolved.
-    fn handle_op(&mut self) {}
 
     /// Handle a range of repetitions of the annotated item.
     ///
@@ -718,6 +652,7 @@ impl EBNFParser {
             }
             self.cur_pos += 1;
         }
+	eprintln!("{}", self.cur_pos);
     }
 
     /// Peek the character delta ahead of the current one.
@@ -760,6 +695,12 @@ impl EBNFParser {
         }
     }
 
+    /// Make a new, unique nonterminal name.
+    fn new_nonterminal(&mut self, annotation: &str) -> String {
+        self.nonce += 1;
+        format!("generated_{}_{}", annotation, self.nonce)
+    }
+
     /// Report a parse error with the line and column number. This procedure
     /// will panic when called.
     fn report_parse_error(&self, message: &str) {
@@ -775,8 +716,8 @@ mod tests {
 
     #[test]
     fn successfully_terminates() {
-        let parser = EBNFParser::new("start: middle\nmiddle: finish", "start");
+        let parser = EBNFParser::new("start: middle\n middle: end", "start");
         let grammar = parser.parse();
-        println!("{:?}", grammar);
+        println!("{:#?}", grammar);
     }
 }

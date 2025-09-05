@@ -580,6 +580,9 @@ mod tests {
             }],
         };
         let parser = Parser::new(&grammar);
-	assert_eq!(parser.next_terminals(&"L_PAREN".to_string()), vec!["R_PAREN".to_string()]);
+        assert_eq!(
+            parser.next_terminals(&"L_PAREN".to_string()),
+            vec!["R_PAREN".to_string()]
+        );
     }
 }
