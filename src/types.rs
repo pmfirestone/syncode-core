@@ -110,7 +110,7 @@ pub struct Grammar {
     /// regexes on the right-hand side of the definitions, including the
     /// definitions of terminals, which can be in terms of other terminals or
     /// regexes.
-    pub terminals: Vec<Production>,
+    pub terminals: Vec<Terminal>,
     /// The original start symbol, not the augmented one we've added.
     pub start_symbol: String,
     /// The productions that make up this grammar, including the start_production.

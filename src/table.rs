@@ -397,14 +397,14 @@ mod tests {
             ),
         ]);
 
-	let expected_goto_table: GotoTable = HashMap::from_iter(vec![
-	    ((0, "s".into()), 1),
-	    ((0, "c".into()), 2),
-	    ((2, "c".into()), 5),
-	    ((3, "c".into()), 8),
-	    ((6, "c".into()), 9)
-	]);
+        let expected_goto_table: GotoTable = HashMap::from_iter(vec![
+            ((0, "s".into()), 1),
+            ((0, "c".into()), 2),
+            ((2, "c".into()), 5),
+            ((3, "c".into()), 8),
+            ((6, "c".into()), 9),
+        ]);
         assert_eq!(action_table, expected_action_table);
-	assert_eq!(goto_table, expected_goto_table);
+        assert_eq!(goto_table, expected_goto_table);
     }
 }

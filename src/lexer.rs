@@ -212,6 +212,16 @@ impl Lexer {
         }
     }
 
+    /// Get the Terminal object of this name, if there is one.
+    pub fn get_terminal(&self, name: &String) -> Result<Terminal, ()> {
+        for terminal in &self.terminals {
+            if terminal.name == *name {
+                return Ok(terminal.clone());
+            }
+        }
+        Err(())
+    }
+
     /// Get the next token from text, updating pos, line, and column to the end
     /// of the new token. Return a flag saying whether or not this token is the remainder.
     // An alternative design would be to distinguish between remainder and

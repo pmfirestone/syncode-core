@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use crate::lexer::Lexer;
+use crate::table::tables;
 use crate::types::*;
 
 // Rust RFC 1733 introduces this syntax as a way to alias bounds, which would
@@ -36,9 +37,24 @@ pub struct Parser {
 }
 
 impl Parser {
+    /// Construct a new parser from a grammar.
+    pub fn new(grammar: &Grammar) -> Parser {
+        let Ok(lexer) = Lexer::new(grammar.terminals.clone(), HashSet::new()) else {
+            panic!("Could not construct lexer.")
+        };
+        let (action_table, goto_table) = tables(grammar.clone());
+        Parser {
+            lexer,
+            action_table,
+            goto_table,
+            start_state: 0,
+            token_index: 0,
+        }
+    }
+
     /// Return all the terminals that could come after this one, regardless of
     /// the state the parser is in.
-    pub fn next_terminal(&self, terminal: &String) -> Vec<String> {
+    pub fn next_terminals(&self, terminal: &String) -> Vec<String> {
         let states_that_accept_this_terminal: Vec<usize> = self
             .action_table
             .keys()
@@ -47,7 +63,11 @@ impl Parser {
             .collect();
         let mut terminals_that_could_follow_this_one: Vec<String> = Vec::new();
         for state in states_that_accept_this_terminal {
-            terminals_that_could_follow_this_one.extend(self.follow(&[state]))
+            // Suppose we've accepted this terminal.
+            let Ok(next_state) = self.next(terminal, vec![state]) else {
+                panic!("Bloody Nora, you've made a real dog's breakfast out of this one.")
+            };
+            terminals_that_could_follow_this_one.extend(self.follow(&next_state))
         }
         terminals_that_could_follow_this_one
     }
@@ -532,5 +552,34 @@ mod tests {
             ]),
             accept_sequences
         );
+    }
+
+    #[test]
+    fn terminals_after_this_one() {
+        let grammar = Grammar {
+            symbol_set: vec![
+                "start".to_string(),
+                "L_PAREN".to_string(),
+                "R_PAREN".to_string(),
+                "IDENTIFIER".to_string(),
+            ],
+            terminals: vec![
+                Terminal::new("L_PAREN", r"\(", 0),
+                Terminal::new("R_PAREN", r"\)", 0),
+                Terminal::new("IDENTIFIER", r"[a-zA-Z_]*", 0),
+            ],
+            start_symbol: "start".to_string(),
+            productions: vec![Production {
+                lhs: "start".to_string(),
+                rhs: vec![
+                    "IDENTIFIER".to_string(),
+                    "L_PAREN".to_string(),
+                    "R_PAREN".to_string(),
+                    "start".to_string(),
+                ],
+            }],
+        };
+        let parser = Parser::new(&grammar);
+	assert_eq!(parser.next_terminals(&"L_PAREN".to_string()), vec!["R_PAREN".to_string()]);
     }
 }

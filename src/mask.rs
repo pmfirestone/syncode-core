@@ -133,39 +133,42 @@ pub fn dfa_mask(
     mask
 }
 
-// /// Compute the grammar mask store.
-// ///
-// /// The mask store is constructed offline by enumerating all DFA states QΩ,
-// /// considering all possible terminals in Γ, and all tokens in V. The DFA mask
-// /// store depends on the set of terminals Γ and the model’s vocabulary V. As a
-// /// result, a unique mask store is created for each grammar and tokenizer
-// /// combination, and to enhance efficiency, we cache and reuse this table for
-// /// future inferences.
-// pub fn dfa_mask_store(
-//     lexical_terminals: &Vec<Terminal>,
-//     model_vocabulary: Vec<&[u8]>,
-//     parser: &Parser,
-//     _length_of_terminal_sequences: usize,
-// ) -> DFAMaskStore {
-//     let all_states = all_dfa_states(lexical_terminals);
-//     let mut store: DFAMaskStore = HashMap::new();
-//     for (terminal, state_id) in &all_states {
-//         // For now, hard-code the lookahead of two terminals.
-//         let next_terminals = parser.next_terminal(terminal);
-//         for next_terminal in &next_terminals {
-//             let after_next_terminals = parser.next_terminal(next_terminal);
-//             for after_next_terminal in &after_next_terminals {
-//                 let accept_sequence = vec![next_terminal.clone(), after_next_terminal.clone()];
-//                 let dfa = &terminal.dfa;
-//                 store.insert(
-//                     (terminal.clone(), *state_id, accept_sequence.clone()),
-//                     dfa_mask(dfa, state_id, &accept_sequence, &model_vocabulary),
-//                 );
-//             }
-//         }
-//     }
-//     store
-// }
+/// Compute the grammar mask store.
+///
+/// The mask store is constructed offline by enumerating all DFA states QΩ,
+/// considering all possible terminals in Γ, and all tokens in V. The DFA mask
+/// store depends on the set of terminals Γ and the model’s vocabulary V. As a
+/// result, a unique mask store is created for each grammar and tokenizer
+/// combination, and to enhance efficiency, we cache and reuse this table for
+/// future inferences.
+pub fn dfa_mask_store(
+    lexical_terminals: &Vec<Terminal>,
+    model_vocabulary: Vec<&[u8]>,
+    parser: &Parser,
+    _length_of_terminal_sequences: usize,
+) -> DFAMaskStore {
+    let all_states = all_dfa_states(lexical_terminals);
+    let mut store: DFAMaskStore = HashMap::new();
+    for (terminal, state_id) in &all_states {
+        // For now, hard-code the lookahead of two terminals.
+        let next_terminals = parser.next_terminals(&terminal.name);
+        for next_terminal in &next_terminals {
+            let after_next_terminals = parser.next_terminals(next_terminal);
+            for after_next_terminal in &after_next_terminals {
+                let accept_sequence = vec![
+                    parser.lexer.get_terminal(next_terminal).unwrap(),
+                    parser.lexer.get_terminal(after_next_terminal).unwrap(),
+                ];
+                let dfa = &terminal.dfa;
+                store.insert(
+                    (terminal.clone(), *state_id, accept_sequence.clone()),
+                    dfa_mask(dfa, state_id, &accept_sequence, &model_vocabulary),
+                );
+            }
+        }
+    }
+    store
+}
 
 /// Compute the mask for a given accept sequence and remainder.
 ///
@@ -214,12 +217,7 @@ mod tests {
     fn test_dmatch_case1() {
         let candidate_string = "abba".as_bytes();
         let terminal = Terminal::new("", r"[ab]*cd", 0);
-        let Ok(start_state) = terminal
-            .dfa
-            .start_state(&Config::new().anchored(Anchored::Yes))
-        else {
-            panic!();
-        };
+        let start_state = terminal.start_state();
         assert!(dmatch(candidate_string, &terminal.dfa, &start_state, &[]));
     }
 
@@ -228,12 +226,8 @@ mod tests {
         // False in strict mode, true in overapproximation mode (grammar mask).
         let candidate_string = "abbacdd".as_bytes();
         let terminal = Terminal::new("", r"[ab]*", 0);
-        let Ok(start_state) = terminal
-            .dfa
-            .start_state(&Config::new().anchored(Anchored::Yes))
-        else {
-            panic!();
-        };
+        let start_state = terminal.start_state();
+
         assert!(dmatch(candidate_string, &terminal.dfa, &start_state, &[]));
     }
 
@@ -241,16 +235,8 @@ mod tests {
     fn test_dmatch_case3() {
         // Illustrative example from page 12 of the paper.
         let candidate_string = "_prime():".as_bytes();
-        let terminal = Terminal::new("", r"[a-zA-Z_]*", 0);
-        let Ok(mut start_state) = terminal
-            .dfa
-            .start_state(&Config::new().anchored(Anchored::Yes))
-        else {
-            panic!();
-        };
-        for &b in "is".as_bytes() {
-            start_state = terminal.dfa.next_state(start_state, b);
-        }
+        let terminal = Terminal::new("IDENTIFIER", r"[a-zA-Z_]*", 0);
+        let start_state = terminal.advance(terminal.start_state(), b"is");
         let accept_sequence = vec![
             Terminal::new("L_PAREN", r"\(", 0),
             Terminal::new("R_PAREN", r"\)", 0),
@@ -277,6 +263,20 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn dmatch_supports_unicode() {
+        let candidate_string: &[u8] = &[0xE2, 0x88];
+        let terminal = Terminal::new("FORALL", r"∀", 0);
+        let start_state = terminal.start_state();
+        let accept_sequence = vec![terminal.clone()];
+        assert!(dmatch(
+            candidate_string,
+            &terminal.dfa,
+            &start_state,
+            &accept_sequence
+        ));
+    }
+
     // #[test]
     // fn test_dmatch_case3a() {
     //     // Consuming next terminal leaves residual string.
@@ -285,42 +285,6 @@ mod tests {
     //     starting_state.advance("ab");
     //     let accept_sequence = vec![r"c"];
     //     assert!(dmatch(
-    //         candidate_string,
-    //         &mut starting_state,
-    //         accept_sequence
-    //     ));
-    // }
-
-    // #[test]
-    // fn test_dmatch_ugly_unicode_thing() {
-    //     // This is a nasty token from an actual LLM. They've played us for fools.
-    //     let mut masker = Masker::new();
-    //     let mut starting_state = masker.dfa_builder.build_dfa(r"(?i:0|[1-9]\d*)");
-    //     assert!(!dmatch("ĠĠ", &mut starting_state, vec![]));
-    // }
-
-    // #[test]
-    // fn test_dmatch_supports_unicode_fails() {
-    //     // Make sure dmatch works on tokens that are multiple bytes in UTF-8,
-    //     // even when the match should fail.
-    //     let candidate_string = "³Ġt";
-    //     let accept_sequence = vec![];
-    //     let mut starting_state = matcher.dfa_builder.build_dfa(r"[a-zA-Z_]*");
-    //     assert!(!dmatch(
-    //         candidate_string,
-    //         &mut starting_state,
-    //         accept_sequence
-    //     ));
-    // }
-
-    // #[test]
-    // fn test_dmatch_supports_unicode_case3() {
-    //     // Make sure dmatch works on tokens that are multiple bytes in UTF-8.
-    //     let candidate_string = "iÃ³";
-
-    //     let accept_sequence = vec![r"\(", r"\)"];
-    //     let mut starting_state = matcher.dfa_builder.build_dfa(r"[a-zA-Z_]*");
-    //     assert!(!dmatch(
     //         candidate_string,
     //         &mut starting_state,
     //         accept_sequence
@@ -363,30 +327,84 @@ mod tests {
     //     ));
     // }
 
-    // #[test]
-    // fn test_dfa_mask_name() {
-    //     // Illustrative example from page 13 of the paper.
-    //     let vocabulary = vec!["_prime():", ":#", "¡", " hi", "indeed", "n0pe"];
-    //     let terminal_sequence = vec![r"\(", r"\)"];
-    //     let mut starting_state = matcher.dfa_builder.build_dfa(r"[a-zA-Z_]*");
-    //     starting_state.advance("is");
-    //     assert_eq!(
-    //         dfa_mask(&mut starting_state, &terminal_sequence, &vocabulary),
-    //         vec![true, false, false, false, true, false],
-    //     );
-    // }
+    #[test]
+    fn test_dfa_mask_name() {
+        // Illustrative example from page 13 of the paper.
+        let vocabulary = vec![
+            "_prime():".as_bytes(),
+            ":#".as_bytes(),
+            "¡".as_bytes(),
+            " hi".as_bytes(),
+            "indeed".as_bytes(),
+            "n0pe".as_bytes(),
+        ];
+        let terminal_sequence = vec![
+            Terminal::new("L_PAREN", r"\(", 0),
+            Terminal::new("R_PAREN", r"\)", 0),
+        ];
+        let terminal = Terminal::new("IDENTIFIER", r"[a-zA-Z_]*", 0);
+        let starting_state = terminal.advance(terminal.start_state(), b"is");
+        assert_eq!(
+            dfa_mask(
+                &terminal.dfa,
+                &starting_state,
+                &terminal_sequence,
+                &vocabulary
+            ),
+            vec![true, false, false, false, true, false]
+        );
+    }
 
-    // #[test]
-    // fn test_dfa_mask_store() {
-    //     let model_vocabulary = vec!["_prime():", "ĠĠ", "'''", " hi", "indeed", "n0pe"];
-    //     let lexical_terminals = vec![r"\(", r"\)", r"[a-zA-Z_]*"];
-    //     let store = dfa_mask_store(lexical_terminals, model_vocabulary, 2);
-    //     let candidate_string = "is";
-    //     let mut starting_state = matcher.dfa_builder.build_dfa(r"[a-zA-Z_]*");
-    //     starting_state.advance(candidate_string);
-    //     assert_eq!(
-    //         store.get(&(starting_state, vec![r"\(", r"\)"])).unwrap(),
-    //         &vec![true, false, false, false, true, false],
-    //     );
-    // }
+    #[test]
+    fn test_dfa_mask_store() {
+        let model_vocabulary: Vec<&[u8]> = vec![
+            "_prime():".as_bytes(),
+            &[0xE2, 0x88],
+            "'''".as_bytes(),
+            " hi".as_bytes(),
+            "indeed".as_bytes(),
+            "n0pe".as_bytes(),
+        ];
+        let lexical_terminals = vec![
+            Terminal::new("L_PAREN", r"\(", 0),
+            Terminal::new("R_PAREN", r"\)", 0),
+            Terminal::new("IDENTIFIER", r"[a-zA-Z_]*", 0),
+        ];
+        let candidate_string = b"is";
+        let terminal = Terminal::new("IDENTIFIER", r"[a-zA-Z_]*", 0);
+        let grammar = Grammar {
+            symbol_set: vec![
+                "L_PAREN".to_string(),
+                "R_PAREN".to_string(),
+                "IDENTIFIER".to_string(),
+            ],
+            terminals: lexical_terminals.clone(),
+            start_symbol: "start".to_string(),
+            productions: vec![Production {
+                lhs: "start".to_string(),
+                rhs: vec![
+                    "IDENTIFIER".to_string(),
+                    "L_PAREN".to_string(),
+                    "R_PAREN".to_string(),
+                    "start".to_string(),
+                ],
+            }],
+        };
+        let parser = Parser::new(&grammar);
+        let store = dfa_mask_store(&lexical_terminals, model_vocabulary, &parser, 2);
+        let starting_state = terminal.advance(terminal.start_state(), candidate_string);
+        assert_eq!(
+            store
+                .get(&(
+                    terminal,
+                    starting_state,
+                    vec![
+                        Terminal::new("L_PAREN", r"\(", 0),
+                        Terminal::new("R_PAREN", r"\)", 0),
+                    ]
+                ))
+                .unwrap(),
+            &vec![true, false, false, false, true, false],
+        );
+    }
 }
