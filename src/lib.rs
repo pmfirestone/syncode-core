@@ -19,10 +19,10 @@ outside of the grammar.
 
 !*/
 // pub mod desugar;
-// pub mod dfa;
-pub mod grammar;
-// pub mod lexer;
-// pub mod mask;
-// pub mod parser;
-// pub mod table;
+pub mod dfa;
+// pub mod grammar;
+pub mod lexer;
+pub mod mask;
+pub mod parser;
+pub mod table;
 pub mod types;

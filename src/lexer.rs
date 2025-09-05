@@ -5,7 +5,6 @@
 use regex_automata::dfa::{Automaton, StartKind, dense};
 use regex_automata::{Anchored, util::start};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 use crate::types::{Terminal, Token};
 
@@ -36,11 +35,11 @@ struct Scanner {
     /// Maps DFA match pattern to the TerminalDef it represents.
     index_to_type: HashMap<usize, Terminal>,
     /// Maps token type name to whether it can contain newlines.
-    _newline_types: HashSet<Arc<str>>,
+    _newline_types: HashSet<String>,
     /// Terminal definitions for reference.
     _terminals: Vec<Terminal>,
     /// All allowed types.
-    pub _allowed_types: HashSet<Arc<str>>,
+    pub _allowed_types: HashSet<String>,
 }
 
 impl Scanner {

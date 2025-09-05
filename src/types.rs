@@ -17,28 +17,28 @@ use std::{cell::LazyCell, rc::Rc};
 /// A symbol of the grammar is either a terminal or a nonterminal.
 ///
 /// Each is identified by a unique number.
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub enum Symbol {
-    Terminal(usize),
-    NonTerminal(usize),
-}
+// #[derive(Clone, Debug, Hash, Eq, PartialEq)]
+// pub enum Symbol {
+//     Terminal(usize),
+//     NonTerminal(usize),
+// }
 
-/// Convenience type bindings to make the definitions of grammars more readable.
-type Terminal = usize;
-type NonTerminal = usize;
+// /// Convenience type bindings to make the definitions of grammars more readable.
+// type Terminal = usize;
+// type NonTerminal = usize;
 
-/// A grammar has four components.
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct Grammar {
-    /// The set of terminals that are in this grammar.
-    pub terminals: Vec<Terminal>,
-    /// The set of nonterminals that are active in this grammar.
-    pub nonterminals: Vec<NonTerminal>,
-    /// The first production; this one is the augmented one added to the grammar.
-    pub start_nonterminal: NonTerminal,
-    /// The productions that make up this grammar, including the start_production.
-    pub productions: Vec<(NonTerminal, Vec<Symbol>)>,
-}
+// /// A grammar has four components.
+// #[derive(Clone, Debug, Hash, Eq, PartialEq)]
+// pub struct Grammar {
+//     /// The set of terminals that are in this grammar.
+//     pub terminals: Vec<Terminal>,
+//     /// The set of nonterminals that are active in this grammar.
+//     pub nonterminals: Vec<NonTerminal>,
+//     /// The first production; this one is the augmented one added to the grammar.
+//     pub start_nonterminal: NonTerminal,
+//     /// The productions that make up this grammar, including the start_production.
+//     pub productions: Vec<(NonTerminal, Vec<Symbol>)>,
+// }
 
 /// A lexical token, what the lexer breaks the input into.
 #[derive(Clone, Debug, PartialEq)]
@@ -48,7 +48,7 @@ pub struct Token {
     /// The type of terminal that this is in the grammar. None if this token
     /// couldn't be lexed, which can happen in the case that this is the
     /// unlexable remainder.
-    pub terminal: Option<Symbol>,
+    pub terminal: Option<Terminal>,
     /// Where in the input the token begins.
     pub start_pos: usize,
     /// Where in the input the token ends.
@@ -62,12 +62,6 @@ pub struct Token {
     /// The column of the input the token ends on.
     pub end_column: usize,
 }
-
-/// A symbol of the grammar.
-///
-/// We implement this as a trait as a hacky way to get an algebraic union of
-/// the Terminal and NonTerminal types.
-pub trait Symbol {}
 
 /// A terminal of the grammar.
 #[derive(Clone)]
@@ -89,19 +83,6 @@ pub struct NonTerminal {
     pub name: String,
 }
 
-impl Symbol for Terminal {}
-
-impl Symbol for NonTerminal {}
-
-// /// An enumeration for symbols of the grammar, to act as an algebraic union
-// /// type of terminals and nonterminals.
-// #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-// pub enum Symbol {
-//     Terminal(String),
-//     NonTerminal(String),
-// }
-
->>>>>>> test
 /// A single production of the grammar.
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Production {
@@ -130,12 +111,11 @@ pub struct Grammar {
     /// definitions of terminals, which can be in terms of other terminals or
     /// regexes.
     pub terminals: Vec<Production>,
-    /// The start symbol; this one is the augmented one added to the grammar.
+    /// The original start symbol, not the augmented one we've added.
     pub start_symbol: String,
     /// The productions that make up this grammar, including the start_production.
     pub productions: Vec<Production>,
 }
-
 
 /// An item of the item set for LR parsing.
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -145,7 +125,7 @@ pub struct Item {
     /// The position of the dot in the result. Invariant: must be in [0, result.len()].
     pub dot: usize,
     /// The look ahead terminal.
-    pub lookahead: Terminal,
+    pub lookahead: String,
 }
 
 /// Action enum for LR parsing.
@@ -162,7 +142,7 @@ pub enum Action {
 }
 
 /// An action table is a map from a (state_id, terminal) pair to an action.
-pub type ActionTable = HashMap<(usize, Terminal), Action>;
+pub type ActionTable = HashMap<(usize, String), Action>;
 
 /// A goto table is a map from a (state_id, nonterminal) pair to a state_id.
 pub type GotoTable = HashMap<(usize, String), usize>;
@@ -241,4 +221,4 @@ impl PartialEq for Terminal {
 impl Eq for Terminal {}
 
 /// A convenience terminal representing the empty string.
-pub const EPSILON: LazyCell<Terminal> = LazyCell::new(|| Terminal::new("epsilon", "", 0));
+pub const EPSILON: LazyCell<Terminal> = LazyCell::new(|| Terminal::new("EPSILON", "", 0));

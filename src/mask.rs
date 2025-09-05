@@ -133,39 +133,39 @@ pub fn dfa_mask(
     mask
 }
 
-/// Compute the grammar mask store.
-///
-/// The mask store is constructed offline by enumerating all DFA states QΩ,
-/// considering all possible terminals in Γ, and all tokens in V. The DFA mask
-/// store depends on the set of terminals Γ and the model’s vocabulary V. As a
-/// result, a unique mask store is created for each grammar and tokenizer
-/// combination, and to enhance efficiency, we cache and reuse this table for
-/// future inferences.
-pub fn dfa_mask_store(
-    lexical_terminals: &Vec<Terminal>,
-    model_vocabulary: Vec<&[u8]>,
-    parser: &Parser,
-    _length_of_terminal_sequences: usize,
-) -> DFAMaskStore {
-    let all_states = all_dfa_states(lexical_terminals);
-    let mut store: DFAMaskStore = HashMap::new();
-    for (terminal, state_id) in &all_states {
-        // For now, hard-code the lookahead of two terminals.
-        let next_terminals = parser.next_terminal(terminal);
-        for next_terminal in &next_terminals {
-            let after_next_terminals = parser.next_terminal(next_terminal);
-            for after_next_terminal in &after_next_terminals {
-                let accept_sequence = vec![next_terminal.clone(), after_next_terminal.clone()];
-                let dfa = &terminal.dfa;
-                store.insert(
-                    (terminal.clone(), *state_id, accept_sequence.clone()),
-                    dfa_mask(dfa, state_id, &accept_sequence, &model_vocabulary),
-                );
-            }
-        }
-    }
-    store
-}
+// /// Compute the grammar mask store.
+// ///
+// /// The mask store is constructed offline by enumerating all DFA states QΩ,
+// /// considering all possible terminals in Γ, and all tokens in V. The DFA mask
+// /// store depends on the set of terminals Γ and the model’s vocabulary V. As a
+// /// result, a unique mask store is created for each grammar and tokenizer
+// /// combination, and to enhance efficiency, we cache and reuse this table for
+// /// future inferences.
+// pub fn dfa_mask_store(
+//     lexical_terminals: &Vec<Terminal>,
+//     model_vocabulary: Vec<&[u8]>,
+//     parser: &Parser,
+//     _length_of_terminal_sequences: usize,
+// ) -> DFAMaskStore {
+//     let all_states = all_dfa_states(lexical_terminals);
+//     let mut store: DFAMaskStore = HashMap::new();
+//     for (terminal, state_id) in &all_states {
+//         // For now, hard-code the lookahead of two terminals.
+//         let next_terminals = parser.next_terminal(terminal);
+//         for next_terminal in &next_terminals {
+//             let after_next_terminals = parser.next_terminal(next_terminal);
+//             for after_next_terminal in &after_next_terminals {
+//                 let accept_sequence = vec![next_terminal.clone(), after_next_terminal.clone()];
+//                 let dfa = &terminal.dfa;
+//                 store.insert(
+//                     (terminal.clone(), *state_id, accept_sequence.clone()),
+//                     dfa_mask(dfa, state_id, &accept_sequence, &model_vocabulary),
+//                 );
+//             }
+//         }
+//     }
+//     store
+// }
 
 /// Compute the mask for a given accept sequence and remainder.
 ///

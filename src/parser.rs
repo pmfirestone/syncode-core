@@ -38,14 +38,14 @@ pub struct Parser {
 impl Parser {
     /// Return all the terminals that could come after this one, regardless of
     /// the state the parser is in.
-    pub fn next_terminal(&self, terminal: &Terminal) -> Vec<Terminal> {
+    pub fn next_terminal(&self, terminal: &String) -> Vec<String> {
         let states_that_accept_this_terminal: Vec<usize> = self
             .action_table
             .keys()
             .filter(|key| key.1 == *terminal)
             .map(|key| key.0)
             .collect();
-        let mut terminals_that_could_follow_this_one: Vec<Terminal> = Vec::new();
+        let mut terminals_that_could_follow_this_one: Vec<String> = Vec::new();
         for state in states_that_accept_this_terminal {
             terminals_that_could_follow_this_one.extend(self.follow(&[state]))
         }
@@ -53,7 +53,7 @@ impl Parser {
     }
 
     /// Return the terminals that the parser will accept in the current state.
-    pub fn follow(&self, state_stack: &[usize]) -> Vec<Terminal> {
+    pub fn follow(&self, state_stack: &[usize]) -> Vec<String> {
         self.action_table
             .keys()
             .filter(|key| key.0 == *state_stack.last().unwrap())
@@ -66,7 +66,7 @@ impl Parser {
     /// The inner loop of the LR parsing algorithm.
     pub fn next(
         &self,
-        terminal: &Terminal,
+        terminal: &String,
         state_stack: Vec<usize>,
     ) -> Result<Vec<usize>, ParserError> {
         // This implementation is verbose because of the error handling
@@ -153,9 +153,9 @@ impl Parser {
     pub fn parse(
         &self,
         partial_output: &[u8],
-    ) -> Result<(HashSet<Vec<Terminal>>, Token), ParserError> {
-        let mut a0: Vec<Terminal> = Vec::new();
-        let mut a1: Vec<Terminal> = Vec::new();
+    ) -> Result<(HashSet<Vec<String>>, Token), ParserError> {
+        let mut a0: Vec<String> = Vec::new();
+        let mut a1: Vec<String> = Vec::new();
 
         let Ok((tokens, remainder)) = self.lexer.lex(partial_output) else {
             return Err(ParserError::LexerError);
@@ -165,9 +165,7 @@ impl Parser {
         let mut state_stack = vec![self.start_state];
 
         for token in &tokens[..] {
-            let Some(terminal) = token.terminal.clone() else {
-                return Err(ParserError::InvalidToken);
-            };
+            let terminal = token.clone().terminal.unwrap().name.clone();
             // FIXME: There must be a less horrid way to do this.
             let Ok(new_state_stack) = self.next(&terminal, state_stack) else {
                 break;
@@ -179,12 +177,10 @@ impl Parser {
 
         // There are two cases for accept sequences. See section 4.5 of the
         // paper and Algorithm 4, lines 15-21.
-        let mut accept_sequences: HashSet<Vec<Terminal>> = HashSet::new();
+        let mut accept_sequences: HashSet<Vec<String>> = HashSet::new();
         if last_token == remainder {
             // Case 1: the remainder is the last lexical token.
-            let Some(remainder_type) = remainder.clone().terminal else {
-                return Err(ParserError::StackUnderflow);
-            };
+            let remainder_type = remainder.clone().terminal.unwrap().name;
             for terminal in a1 {
                 accept_sequences.insert(vec![remainder_type.clone(), terminal]);
             }
@@ -365,39 +361,31 @@ mod tests {
         vec![
             Production {
                 lhs: "goal".into(),
-                rhs: vec![Symbol::NonTerminal("sums".into()), Symbol::Terminal(eof())],
+                rhs: vec!["sums".into(), "$".into()],
             },
             Production {
                 lhs: "sums".into(),
-                rhs: vec![
-                    Symbol::NonTerminal("sums".into()),
-                    Symbol::Terminal(plus()),
-                    Symbol::NonTerminal("products".into()),
-                ],
+                rhs: vec!["sums".into(), "PLUS".into(), "products".into()],
             },
             Production {
                 lhs: "sums".into(),
-                rhs: vec![Symbol::NonTerminal("products".into())],
+                rhs: vec!["products".into()],
             },
             Production {
                 lhs: "products".into(),
-                rhs: vec![
-                    Symbol::NonTerminal("products".into()),
-                    Symbol::Terminal(star()),
-                    Symbol::NonTerminal("value".into()),
-                ],
+                rhs: vec!["products".into(), "STAR".into(), "value".into()],
             },
             Production {
                 lhs: "products".into(),
-                rhs: vec![Symbol::NonTerminal("value".into())],
+                rhs: vec!["value".into()],
             },
             Production {
                 lhs: "value".into(),
-                rhs: vec![Symbol::Terminal(dec_number())],
+                rhs: vec!["DEC_NUMBER".into()],
             },
             Production {
                 lhs: "value".into(),
-                rhs: vec![Symbol::Terminal(word())],
+                rhs: vec!["WORD".into()],
             },
         ]
     }
@@ -405,31 +393,31 @@ mod tests {
     fn calc_action_table() -> ActionTable {
         let rules = calc_rules();
         HashMap::from([
-            ((0, dec_number()), Action::Shift(8)),
-            ((0, word()), Action::Shift(9)),
-            ((1, plus()), Action::Shift(2)),
-            ((1, eof()), Action::Accept),
-            ((2, dec_number()), Action::Shift(8)),
-            ((2, word()), Action::Shift(9)),
-            ((3, star()), Action::Shift(5)),
-            ((3, plus()), Action::Reduce(rules[1].clone())),
-            ((4, star()), Action::Shift(5)),
-            ((4, plus()), Action::Reduce(rules[2].clone())),
-            ((4, eof()), Action::Reduce(rules[2].clone())),
-            ((5, dec_number()), Action::Shift(8)),
-            ((5, word()), Action::Shift(9)),
-            ((6, star()), Action::Reduce(rules[3].clone())),
-            ((6, plus()), Action::Reduce(rules[3].clone())),
-            ((6, eof()), Action::Reduce(rules[3].clone())),
-            ((7, star()), Action::Reduce(rules[4].clone())),
-            ((7, plus()), Action::Reduce(rules[4].clone())),
-            ((7, eof()), Action::Reduce(rules[4].clone())),
-            ((8, star()), Action::Reduce(rules[5].clone())),
-            ((8, plus()), Action::Reduce(rules[5].clone())),
-            ((8, eof()), Action::Reduce(rules[5].clone())),
-            ((9, star()), Action::Reduce(rules[6].clone())),
-            ((9, plus()), Action::Reduce(rules[6].clone())),
-            ((9, eof()), Action::Reduce(rules[6].clone())),
+            ((0, "DEC_NUMBER".into()), Action::Shift(8)),
+            ((0, "WORD".into()), Action::Shift(9)),
+            ((1, "PLUS".into()), Action::Shift(2)),
+            ((1, "$".into()), Action::Accept),
+            ((2, "DEC_NUMBER".into()), Action::Shift(8)),
+            ((2, "WORD".into()), Action::Shift(9)),
+            ((3, "STAR".into()), Action::Shift(5)),
+            ((3, "PLUS".into()), Action::Reduce(rules[1].clone())),
+            ((4, "STAR".into()), Action::Shift(5)),
+            ((4, "PLUS".into()), Action::Reduce(rules[2].clone())),
+            ((4, "$".into()), Action::Reduce(rules[2].clone())),
+            ((5, "DEC_NUMBER".into()), Action::Shift(8)),
+            ((5, "WORD".into()), Action::Shift(9)),
+            ((6, "STAR".into()), Action::Reduce(rules[3].clone())),
+            ((6, "PLUS".into()), Action::Reduce(rules[3].clone())),
+            ((6, "$".into()), Action::Reduce(rules[3].clone())),
+            ((7, "STAR".into()), Action::Reduce(rules[4].clone())),
+            ((7, "PLUS".into()), Action::Reduce(rules[4].clone())),
+            ((7, "$".into()), Action::Reduce(rules[4].clone())),
+            ((8, "STAR".into()), Action::Reduce(rules[5].clone())),
+            ((8, "PLUS".into()), Action::Reduce(rules[5].clone())),
+            ((8, "$".into()), Action::Reduce(rules[5].clone())),
+            ((9, "STAR".into()), Action::Reduce(rules[6].clone())),
+            ((9, "PLUS".into()), Action::Reduce(rules[6].clone())),
+            ((9, "$".into()), Action::Reduce(rules[6].clone())),
         ])
     }
 
@@ -467,8 +455,13 @@ mod tests {
     #[test]
     fn calc_grammar_step_through_states() {
         let parser = calc_parser();
-        let terminals_to_parse: Vec<Terminal> =
-            vec![word(), star(), dec_number(), plus(), dec_number()];
+        let terminals_to_parse: Vec<String> = vec![
+            "WORD".into(),
+            "STAR".into(),
+            "DEC_NUMBER".into(),
+            "PLUS".into(),
+            "DEC_NUMBER".into(),
+        ];
         let state_stack: Vec<usize> = vec![parser.start_state];
 
         let Ok(state_stack) = parser.next(&terminals_to_parse[0], state_stack) else {
@@ -531,11 +524,11 @@ mod tests {
         // possibly become a WORD and could only continue to be a DEC_NUMBER.
         assert_eq!(
             HashSet::from([
-                vec![dec_number(), star()],
-                vec![dec_number(), plus()],
-                vec![dec_number(), eof()],
-                vec![word()],
-                vec![dec_number()]
+                vec!["DEC_NUMBER".into(), "STAR".into()],
+                vec!["DEC_NUMBER".into(), "PLUS".into()],
+                vec!["DEC_NUMBER".into(), "$".into()],
+                vec!["WORD".into()],
+                vec!["DEC_NUMBER".into()]
             ]),
             accept_sequences
         );
