@@ -18,7 +18,6 @@ constructed with sufficient lookahead, prevent the model from ever going
 outside of the grammar.
 
 !*/
-// pub mod desugar;
 pub mod dfa;
 // pub mod grammar;
 pub mod lexer;
