@@ -73,6 +73,13 @@ struct EBNFParser {
 }
 
 /// The terminals of the grammar description language.
+///
+/// We will use these to check the beginning of the string, so they all begin
+/// with a beginning-of-string anchor. This is because the Regex library does
+/// not include the ability to check whether a match begins at a certain point
+/// in the string, though we may have to implement this behavior ourself in the
+/// future to enable lookaround matching, rather than simply using sring
+/// slicing to force the behavior we want.
 // Anchor these to the beginning of the string, because we will be using the regex
 // to pop the terminal off the beginning of the input.
 
@@ -82,7 +89,7 @@ const NL: &str = r"^(\r?\n)+\s*";
 const NL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NL).unwrap());
 const REGEXP: &str = r"/(?!/)(\/|\\|[^/])*?/[imslux]*";
 const REGEXP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(REGEXP).unwrap());
-const OP: &str = r"^[+*]|[?][a-z]";
+const OP: &str = r"^[+\*]|[?][a-z]";
 const OP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(OP).unwrap());
 const VBAR: &str = r"^((\r?\n)+\s*)?\|";
 const VBAR_RE: Lazy<Regex> = Lazy::new(|| Regex::new(VBAR).unwrap());
@@ -153,7 +160,7 @@ impl EBNFParser {
         // We know there's a match because this method is only called after
         // we've already determined that the next thing is a rule.
         let rule_match = RULE_RE.find_at(&self.input_string, self.cur_pos).unwrap();
-        eprintln!("{:?}", rule_match);
+        // eprintln!("{:?}", rule_match);
         self.cur_parsing = Item::RULE;
         self.name_stack.push(rule_match.as_str().into());
         self.consume(rule_match.len());
@@ -273,7 +280,7 @@ impl EBNFParser {
 
         loop {
             let cur_alias = self.parse_alias();
-            eprintln!("{:?}", cur_alias);
+            // eprintln!("cur_alias: {:?}", cur_alias);
             match self.cur_parsing {
                 Item::RULE => {
                     // Push a new production to the set of productions.
@@ -341,7 +348,9 @@ impl EBNFParser {
         while self.cur_line == start_line && self.cur_pos < self.input_string.len() {
             self.consume_space();
             res.push(self.parse_expression());
-            eprintln!("{:?}", res);
+	    self.consume_space();
+	    // eprintln!("line: {}", self.cur_line);
+            // eprintln!("parse_expression: {:?}", res);
         }
         res
     }
@@ -353,12 +362,15 @@ impl EBNFParser {
     /// This level of the grammar separates the quantifiers from the thing they
     /// quantify.
     fn parse_expression(&mut self) -> String {
-        let new_atom = self.parse_atom();	
-        self.consume_space();
-        if OP_RE.is_match_at(&self.input_string, self.cur_pos) {
+        let new_atom = self.parse_atom();
+	// eprintln!("parse_expression: {}", new_atom);
+	// eprintln!("cur_pos: {}", self.cur_pos);
+        // self.consume_space();
+        if OP_RE.is_match(&self.input_string[self.cur_pos..]) {
+	    // eprintln!("Match on OP_RE");
             let new_nonterm = self.new_nonterminal("expression");
             match OP_RE
-                .find_at(&self.input_string, self.cur_pos)
+                .find(&self.input_string[self.cur_pos..])
                 .unwrap()
                 .as_str()
             {
@@ -400,6 +412,7 @@ impl EBNFParser {
                 }
                 _ => { /* We should never reach this because we already matched above. */ }
             }
+	    self.consume(1);
             return new_nonterm;
         // } else if self.peek(0) == Some('~') {
         //     // The following is a range of some kind.
@@ -407,6 +420,7 @@ impl EBNFParser {
         //     self.consume_space();
         //     // self.handle_range();
         } else {
+	    eprintln!("No match on OP_RE");
             // An unquantified atom.
             new_atom
         }
@@ -454,7 +468,7 @@ impl EBNFParser {
 		let input_string = self.input_string.clone();
                 let Some(matched_string) = STRING_RE.find_at(&input_string, self.cur_pos)
                 else {
-                    self.report_parse_error("String never terminated");
+                    self.report_parse_error("String never terminated.");
 		    return "".to_string();
                 };
 		self.consume(matched_string.len());
@@ -652,7 +666,7 @@ impl EBNFParser {
             }
             self.cur_pos += 1;
         }
-	eprintln!("{}", self.cur_pos);
+	// eprintln!("{}", self.cur_pos);
     }
 
     /// Peek the character delta ahead of the current one.
@@ -668,6 +682,7 @@ impl EBNFParser {
     fn consume_space(&mut self) {
         while self.cur_pos < self.input_string.len()
             && (self.peek(0) == Some(' ')
+		|| self.peek(0) == Some('\n')
                 || self.peek(0) == Some('\t')
                 || self.peek(0) == Some('#')
                 || self.peek(0) == Some('/') && self.peek(1) == Some('/'))
@@ -716,7 +731,7 @@ mod tests {
 
     #[test]
     fn successfully_terminates() {
-        let parser = EBNFParser::new("start: middle\n middle: end", "start");
+        let parser = EBNFParser::new("start: middle\nmiddle: end*", "start");
         let grammar = parser.parse();
         println!("{:#?}", grammar);
     }
