@@ -415,12 +415,12 @@ impl EBNFParser {
             }
             self.consume(1);
             return new_nonterm;
-        // TODO: Add support for range repeats.
-        // } else if self.peek(0) == Some('~') {
-        //     // The following is a range of some kind.
-        //     self.consume(1);
-        //     self.consume_space();
-        //     // self.handle_range();
+            // TODO: Add support for range repeats.
+            // } else if self.peek(0) == Some('~') {
+            //     // The following is a range of some kind.
+            //     self.consume(1);
+            //     self.consume_space();
+            //     // self.handle_range();
         } else {
             // eprintln!("No match on OP_RE");
             // An unquantified atom.
