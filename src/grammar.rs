@@ -241,7 +241,9 @@ impl EBNFParser {
                 self.consume("%declare".len());
                 // self.parse_declare()
             }
-            _ => self.report_parse_error("Invalid statement."),
+            _ => {
+                self.report_parse_error("Invalid statement.");
+            }
         }
     }
 
@@ -260,7 +262,8 @@ impl EBNFParser {
         let Some(number_match) = NUMBER_RE.find(&self.input_string[self.cur_pos..]) else {
             // Add a return statement to make the compiler happy, even though
             // this call never returns.
-            return self.report_parse_error("Expected a number.");
+            self.report_parse_error("Expected a number.");
+            return;
         };
 
         // Parsing as an integer *should* never fail, since we've just matched
@@ -345,7 +348,6 @@ impl EBNFParser {
     ///
     /// `expansion: expr*`
     fn parse_expansion(&mut self) -> Vec<String> {
-        // Naughty way to check whether we're still on the same line.
         let start_line = self.cur_line;
         let mut res = vec![];
         while self.cur_line == start_line && self.cur_pos < self.input_string.len() {
@@ -372,7 +374,6 @@ impl EBNFParser {
         let new_atom = self.parse_atom();
         // eprintln!("parse_expression: {}", new_atom);
         // eprintln!("cur_pos: {}", self.cur_pos);
-        // self.consume_space();
         if OP_RE.is_match(&self.input_string[self.cur_pos..]) {
             // eprintln!("Match on OP_RE");
             let new_nonterm = self.new_nonterminal("expression");
@@ -421,6 +422,7 @@ impl EBNFParser {
             }
             self.consume(1);
             return new_nonterm;
+        // TODO: Add support for range repeats.
         // } else if self.peek(0) == Some('~') {
         //     // The following is a range of some kind.
         //     self.consume(1);
@@ -455,8 +457,7 @@ impl EBNFParser {
                 self.consume(1);
                 return self.name_stack.pop().unwrap().clone();
             } else {
-                self.report_parse_error("Expected ')'.");
-                return "".to_string(); // Panics in previous line, but make the compiler happy.
+                self.report_parse_error("Expected ')'.")
             }
         } else {
             self.parse_value()
@@ -477,8 +478,7 @@ impl EBNFParser {
                 // TODO: Implement literal ranges.
                 let input_string = self.input_string.clone();
                 let Some(matched_string) = STRING_RE.find(&input_string[self.cur_pos..]) else {
-                    self.report_parse_error("String never terminated.");
-                    return "".to_string();
+                    return self.report_parse_error("String never terminated.");
                 };
                 self.consume(matched_string.len());
                 // Trim surounding quotation marks for return value.
@@ -503,8 +503,7 @@ impl EBNFParser {
             self.consume(token_match.len());
             return token_match.as_str().into();
         } else {
-            self.report_parse_error("Expected a RULE or a TOKEN.");
-            return "".into();
+            self.report_parse_error("Expected a RULE or a TOKEN.")
         }
     }
 
@@ -594,7 +593,7 @@ impl EBNFParser {
     /// dependencies (e.g. like you would when inheriting a class).
     ///
     /// Syntax:
-    ///    ```
+    /// ```
     /// %import <module>.<TERMINAL>
     /// %import <module>.<rule>
     /// %import <module>.<TERMINAL> -> <NEWTERMINAL>
@@ -728,7 +727,7 @@ impl EBNFParser {
 
     /// Report a parse error with the line and column number. This procedure
     /// will panic when called.
-    fn report_parse_error(&self, message: &str) {
+    fn report_parse_error(&self, message: &str) -> String {
         panic!(
             "EBNF parse error at line {}, column {}: {message}",
             self.cur_line, self.cur_column
@@ -741,7 +740,7 @@ mod tests {
 
     #[test]
     fn successfully_terminates() {
-        let parser = EBNFParser::new("start: A+ | A (B C)*", "start");
+        let parser = EBNFParser::new("start: (middle* | Y)\nmiddle: A+", "start");
         let grammar = parser.parse();
         println!("{:#?}", grammar);
     }
