@@ -738,7 +738,7 @@ mod tests {
 
     #[test]
     fn successfully_terminates() {
-        let parser = EBNFParser::new("s: c c\n c: C c | D", "s");
+        let parser = EBNFParser::new("s: [c]", "s");
         let grammar = parser.parse();
         println!("{:#?}", grammar);
     }
