@@ -75,9 +75,9 @@ const VBAR: &str = r"^((\r?\n)+\s*)?\|";
 const VBAR_RE: Lazy<Regex> = Lazy::new(|| Regex::new(VBAR).unwrap());
 const NUMBER: &str = r"^(+|-)?[0-9]+";
 const NUMBER_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NUMBER).unwrap());
-const RULE: &str = r"!?[_?]?[a-z][_a-z0-9]*";
+const RULE: &str = r"^!?[_?]?[a-z][_a-z0-9]*";
 const RULE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(RULE).unwrap());
-const TOKEN: &str = r"_?[A-Z][_A-Z0-9]*";
+const TOKEN: &str = r"^_?[A-Z][_A-Z0-9]*";
 const TOKEN_RE: Lazy<Regex> = Lazy::new(|| Regex::new(TOKEN).unwrap());
 
 impl EBNFParser {
