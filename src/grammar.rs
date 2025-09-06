@@ -312,6 +312,7 @@ impl EBNFParser {
     fn parse_alias(&mut self) -> Vec<String> {
         // self.consume_space();
         let res = self.parse_expansion();
+        // eprintln!("cur_expansion: {:#?}", res);
         self.consume_space();
         if self.cur_pos < self.input_string.len() - 1
             && self.input_string[self.cur_pos..self.cur_pos + 2] == *"->"
