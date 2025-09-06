@@ -280,7 +280,7 @@ impl EBNFParser {
 
         loop {
             let cur_alias = self.parse_alias();
-            eprintln!("cur_alias: {:?}", cur_alias);
+            // eprintln!("cur_alias: {:?}", cur_alias);
             match self.cur_parsing {
                 Item::RULE => {
                     // Push a new production to the set of productions.
@@ -312,12 +312,12 @@ impl EBNFParser {
             self.consume_space();
             if VBAR_RE.is_match(&self.input_string[self.cur_pos..]) {
                 // eprintln!("VBAR match");
-		// Advance past the VBAR to the beginning of the next alias.
+                // Advance past the VBAR to the beginning of the next alias.
                 self.consume_space();
-		self.consume(1);
+                self.consume(1);
                 continue;
             } else {
-                eprintln!("VBAR no match");
+                // eprintln!("VBAR no match");
                 break self.name_stack.last().unwrap().to_string();
             }
         }
@@ -348,16 +348,14 @@ impl EBNFParser {
         // Naughty way to check whether we're still on the same line.
         let start_line = self.cur_line;
         let mut res = vec![];
-        while self.cur_line == start_line
-            && self.cur_pos < self.input_string.len()
-        {
+        while self.cur_line == start_line && self.cur_pos < self.input_string.len() {
             self.consume_space();
             res.push(self.parse_expression());
             self.consume_space();
-	    if VBAR_RE.is_match(&self.input_string[self.cur_pos..]) {
-		// Break off if we reach a VBAR; this tells us that the whole alias is complete.
-		break
-	    }
+            if VBAR_RE.is_match(&self.input_string[self.cur_pos..]) || self.peek(0) == Some(')') {
+                // Break off if we reach a VBAR or a close parenthesis; this tells us that the whole alias is complete.
+                break;
+            }
             // eprintln!("line: {}", self.cur_line);
             // eprintln!("parse_expression: {:?}", res);
         }
@@ -445,17 +443,20 @@ impl EBNFParser {
     ///     | value
     /// ```
     fn parse_atom(&mut self) -> String {
+        // eprintln!("Parsing atom: {}", self.cur_pos);
         if self.peek(0) == Some('(') {
-            // Convert every group ( E ) to a fresh non-terminal X and add X =
-            // E.
+            // Convert every group ( E ) to a fresh non-terminal X and add X = E.
+            // eprintln!("In parentheses");
             self.consume(1);
-            let new_expansion = self.parse_expansions();
+            let new_nonterminal = self.new_nonterminal("group");
+            self.name_stack.push(new_nonterminal);
+            self.parse_expansions();
             if self.peek(0) == Some(')') {
                 self.consume(1);
-                return new_expansion;
+                return self.name_stack.pop().unwrap().clone();
             } else {
                 self.report_parse_error("Expected ')'.");
-                return new_expansion; // Panics in previous line, but 
+                return "".to_string(); // Panics in previous line, but make the compiler happy.
             }
         } else {
             self.parse_value()
@@ -740,7 +741,7 @@ mod tests {
 
     #[test]
     fn successfully_terminates() {
-        let parser = EBNFParser::new("start: middle* | end+", "start");
+        let parser = EBNFParser::new("start: A+ | A (B C)*", "start");
         let grammar = parser.parse();
         println!("{:#?}", grammar);
     }
