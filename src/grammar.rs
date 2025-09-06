@@ -259,7 +259,7 @@ impl EBNFParser {
     /// Each `expansions` is turned into a non-terminal that's represented at
     /// the top level of the grammar by a number of productions.
     fn parse_expansions(&mut self) -> String {
-        self.consume_space();
+        // self.consume_space();
 
         loop {
             let cur_alias = self.parse_alias();
@@ -310,7 +310,7 @@ impl EBNFParser {
     ///
     /// `?alias: expansion ["->" RULE]`
     fn parse_alias(&mut self) -> Vec<String> {
-        self.consume_space();
+        // self.consume_space();
         let res = self.parse_expansion();
         self.consume_space();
         if self.cur_pos < self.input_string.len() - 1
