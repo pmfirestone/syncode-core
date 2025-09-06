@@ -374,12 +374,8 @@ impl EBNFParser {
             // operator. Instead, we manually implement something like this lookahead.
             // eprintln!("Match on OP_RE");
             let new_nonterm = self.new_nonterminal("expression");
-            match OP_RE
-                .find(&self.input_string[self.cur_pos..])
-                .unwrap()
-                .as_str()
-            {
-                "*" => {
+            match self.peek(0).unwrap() {
+                '*' => {
                     // Convert every repetition E* to a fresh non-terminal X
                     // and add X = $\epsilon$ | X E.
                     self.grammar.productions.push(Production {
@@ -391,7 +387,7 @@ impl EBNFParser {
                         rhs: vec![new_nonterm.clone(), new_atom],
                     });
                 }
-                "+" => {
+                '+' => {
                     // Convert every at-least-one repetition E+ to a fresh
                     // non-terminal X and add X = E | X E.
                     self.grammar.productions.push(Production {
@@ -403,7 +399,7 @@ impl EBNFParser {
                         rhs: vec![new_nonterm.clone(), new_atom.clone()],
                     });
                 }
-                "?" => {
+                '?' => {
                     // Convert every option E? to a fresh non-terminal X and
                     // add X = $\epsilon$ | E.
                     self.grammar.productions.push(Production {
