@@ -721,7 +721,7 @@ mod tests {
 
     #[test]
     fn successfully_terminates() {
-        let parser = EBNFParser::new("start: (middle* | Y)\nmiddle: A+", "start");
+        let parser = EBNFParser::new("s: c c\n c: C c | D", "s");
         let grammar = parser.parse();
         println!("{:#?}", grammar);
     }
