@@ -69,7 +69,7 @@ const NL: &str = r"^(\r?\n)+\s*";
 const NL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NL).unwrap());
 const REGEXP: &str = r"/(?!/)(\/|\\|[^/])*?/[imslux]*";
 const REGEXP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(REGEXP).unwrap());
-const OP: &str = r"^[+\*]|[?][a-z]";
+const OP: &str = r"^[+\*\?]";
 const OP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(OP).unwrap());
 const VBAR: &str = r"^((\r?\n)+\s*)?\|";
 const VBAR_RE: Lazy<Regex> = Lazy::new(|| Regex::new(VBAR).unwrap());
@@ -355,7 +355,18 @@ impl EBNFParser {
         let new_atom = self.parse_atom();
         // eprintln!("parse_expression: {}", new_atom);
         // eprintln!("cur_pos: {}", self.cur_pos);
-        if OP_RE.is_match(&self.input_string[self.cur_pos..]) {
+        if OP_RE.is_match(&self.input_string[self.cur_pos..])
+            && !(self.peek(0) == Some('?')
+		 // Use a default value that will evaluate to false to avoid
+		 // panicking in the case where the question mark is the last
+		 // character of the input.
+		 && self.peek(1).unwrap_or('!').is_ascii_lowercase())
+        {
+            // We don't get lookahead in this regex library, but the lark
+            // grammar has the lookahead (?![a-z]) after the question mark
+            // operator, which makes sure we don't treat the question mark at
+            // the beginning of an identifier as a question mark
+            // operator. Instead, we manually implement something like this lookahead.
             // eprintln!("Match on OP_RE");
             let new_nonterm = self.new_nonterminal("expression");
             match OP_RE
