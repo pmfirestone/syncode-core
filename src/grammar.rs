@@ -3,33 +3,13 @@
 Parse [Lark's EBNF](https://lark-parser.readthedocs.io/en/stable/grammar.html)
 and turn it into a `[crate::types::Grammar]` object.
 
-The comments of this file make liberal use of text from Lark's grammar and
-documentation, without explicit attribution.
+FIXME:
+- Broken parentheses with newlines.
+- Populate remaining fields of grammar object besides `start_symbol` and `productions`.
 
-Limitations:
-We do not currently implement the following Lark behaviors (pull requests welcome!):
-- Directives (the statements beginning with %), except %ignore, which we do implement.
-- Priorities for either rules or terminals.
-- Templates that will be expanded by the preprocessor.
-- Square brackets for maybes. These are replaced by parentheses followed by a question mark.
-- Magic intial characters for identifiers (underscore, question mark, and exclaimation point).
-- Aliases for productions.
-- Case insensitive string literals.
-
-We provide versions of grammars where these features have been removed or inlined as applicable, as well as a formal specification of the subset of the grammar we implement.
-
-The algorithm, at a high level, behaves as follows:
-
-1. Scan the entire input once to identify all the terminals and non-terminals,
-assigning them an index in the grammar. We assign maps between their names and
-their index, and for terminals we also construct a vector of their respective
-DFAs that can be indexed by the terminals' indices.
-
-2. Parse the input, constructing "sugary" productions that contain grouping, choice, and quantifying operations, in addition to terminals and nonterminals.
-
-3. "Desugar" the productions by repeatedly expanding groupings, choices, and quantifiers until the production yields only terminals and nonterminals.
-
-4. Convert the members of the productions into their numerical indices rather than their string names and construct the Grammar struct that this module ultimately returns.
+TODO:
+- Implement "maybe" blocks (square brackets).
+- Implement directives.
 !*/
 
 use crate::types::*;
