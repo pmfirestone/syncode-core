@@ -335,8 +335,13 @@ impl EBNFParser {
             self.consume_space();
             res.push(self.parse_expression());
             self.consume_space();
-            if VBAR_RE.is_match(&self.input_string[self.cur_pos..]) || self.peek(0) == Some(')') {
-                // Break off if we reach a VBAR or a close parenthesis; this tells us that the whole alias is complete.
+            if VBAR_RE.is_match(&self.input_string[self.cur_pos..])
+                || self.peek(0) == Some(')')
+                || self.peek(0) == Some(']')
+            {
+                // Break off if we reach a VBAR, a close parenthesis, or a
+                // close bracket; this tells us that the whole alias is
+                // complete.
                 break;
             }
             // eprintln!("line: {}", self.cur_line);
@@ -450,6 +455,20 @@ impl EBNFParser {
                 return self.name_stack.pop().unwrap().clone();
             } else {
                 self.report_parse_error("Expected ')'.")
+            }
+        } else if self.peek(0) == Some('[') {
+            // `[item item ..]` is a maybe statement. It's the same as (item item..)?
+            self.consume(1);
+            let new_nonterminal = self.new_nonterminal("group");
+            self.name_stack.push(new_nonterminal);
+            self.parse_expansions();
+            if self.peek(0) == Some(']') {
+                self.consume(1);
+                // Hack to get the caller (`parse_expression`) to engage the option logic.
+                self.input_string.insert(self.cur_pos, '?');
+                return self.name_stack.pop().unwrap().clone();
+            } else {
+                self.report_parse_error("Expected ']'.")
             }
         } else {
             self.parse_value()
@@ -642,15 +661,6 @@ impl EBNFParser {
     /// There is no requirement for a rule/terminal to come from another file,
     /// but that is probably the most common use case.
     fn expand_extends(&mut self) {}
-
-    /// Replace square brackets with ()?.
-    ///
-    /// `[item item ..]` is a maybe statement. It's the same as (item item
-    /// ..)?, but when maybe_placeholders=True, Lark generates None if there is
-    /// no match. since we don't care about this behavior (because we aren't
-    /// generating an abstract syntax tree), we simplify parsing by replacing
-    /// the brackets with parentheses and a question mark.
-    fn replace_square_brackets(&mut self) {}
 
     /// Consume the specified number of characters, maintaining line and column number.
     fn consume(&mut self, count: usize) {
