@@ -63,11 +63,11 @@ struct EBNFParser {
 // Anchor these to the beginning of the string, because we will be using the regex
 // to pop the terminal off the beginning of the input.
 
-const STRING: &str = r#"^\".*?(?<!\)(\\)*?\"i?"#;
+const STRING: &str = r#"^\".*?(\\)*?\"i?"#;
 const STRING_RE: Lazy<Regex> = Lazy::new(|| Regex::new(STRING).unwrap());
 const NL: &str = r"^(\r?\n)+\s*";
 const NL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NL).unwrap());
-const REGEXP: &str = r"/(?!/)(\/|\\|[^/])*?/[imslux]*";
+const REGEXP: &str = r#"^\/(\\\/|\\\\|[^\/])*?\/[imslux]*"#;
 const REGEXP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(REGEXP).unwrap());
 const OP: &str = r"^[+\*\?]";
 const OP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(OP).unwrap());
@@ -127,6 +127,8 @@ impl EBNFParser {
                 self.report_parse_error("Invalid item.");
             }
         }
+        self.grammar.symbol_set.sort();
+        self.grammar.symbol_set.dedup();
         self.grammar
     }
 
@@ -271,6 +273,9 @@ impl EBNFParser {
                         lhs: self.name_stack.last().unwrap().to_string(),
                         rhs: cur_alias,
                     });
+                    self.grammar
+                        .symbol_set
+                        .push(self.name_stack.last().unwrap().to_string());
                 }
                 Item::TOKEN => {
                     // Push a new terminal to the set of terminals.
@@ -280,7 +285,6 @@ impl EBNFParser {
                     // their right-hand side. The remainder of SynCode's logic
                     // assumes that terminals are each a single regex, an
                     // requirement not enforced by Lark's syntax.
-
                     // self.grammar.terminals.push(Production {
                     //     lhs: self.name_stack.last().unwrap().to_string(),
                     //     rhs: cur_alias,
@@ -292,7 +296,7 @@ impl EBNFParser {
             }
 
             // If there's another alias, parse it.
-            self.consume_space();
+            // self.consume_space();
             if VBAR_RE.is_match(&self.input_string[self.cur_pos..]) {
                 // eprintln!("VBAR match");
                 // Advance past the VBAR to the beginning of the next alias.
@@ -313,14 +317,15 @@ impl EBNFParser {
         // self.consume_space();
         let res = self.parse_expansion();
         // eprintln!("cur_expansion: {:#?}", res);
-        self.consume_space();
+        // self.consume_to_end_of_line();
         if self.cur_pos < self.input_string.len() - 1
             && self.input_string[self.cur_pos..self.cur_pos + 2] == *"->"
         {
+	    // eprintln!("Got ->");
             // We don't actually care about aliases: they only matter to the
             // parse tree that Lark would build if it was using this
             // grammar. Just skip to the end of the line.
-            self.consume_to_end_of_line();
+	    self.consume_to_end_of_line();
         }
         res
     }
@@ -338,10 +343,9 @@ impl EBNFParser {
             if VBAR_RE.is_match(&self.input_string[self.cur_pos..])
                 || self.peek(0) == Some(')')
                 || self.peek(0) == Some(']')
+		|| (self.peek(0) == Some('-') && self.peek(1) == Some('>'))
             {
-                // Break off if we reach a VBAR, a close parenthesis, or a
-                // close bracket; this tells us that the whole alias is
-                // complete.
+                // Break off whenever we reach something that's in the follow set of expr.
                 break;
             }
             // eprintln!("line: {}", self.cur_line);
@@ -414,6 +418,7 @@ impl EBNFParser {
                 _ => { /* We should never reach this because we already matched above. */ }
             }
             self.consume(1);
+            self.grammar.symbol_set.push(new_nonterm.clone());
             return new_nonterm;
             // TODO: Add support for range repeats.
             // } else if self.peek(0) == Some('~') {
@@ -504,10 +509,12 @@ impl EBNFParser {
         if RULE_RE.is_match(&self.input_string[self.cur_pos..]) {
             let rule_match = RULE_RE.find(&input_string[self.cur_pos..]).unwrap();
             self.consume(rule_match.len());
+	    self.grammar.symbol_set.push(rule_match.as_str().to_string());
             return rule_match.as_str().into();
         } else if TOKEN_RE.is_match(&self.input_string[self.cur_pos..]) {
             let token_match = TOKEN_RE.find(&input_string[self.cur_pos..]).unwrap();
             self.consume(token_match.len());
+	    self.grammar.symbol_set.push(token_match.as_str().to_string());
             return token_match.as_str().into();
         } else {
             self.report_parse_error("Expected a RULE or a TOKEN.")
@@ -527,14 +534,12 @@ impl EBNFParser {
     /// grammar and treat them as such.
     fn parse_regex(&mut self) -> String {
         let input_string = self.input_string.clone();
-        self.consume(1);
         let Some(re_match) = REGEXP_RE.find(&input_string[self.cur_pos..]) else {
             self.report_parse_error("Failed to parse regular expression.");
             return "".into();
         };
         self.consume(re_match.len());
         // Eat the final slash.
-        self.consume(1);
         re_match.as_str().into()
     }
 
@@ -735,10 +740,50 @@ impl EBNFParser {
 
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
-    fn successfully_terminates() {
-        let parser = EBNFParser::new("s: [c]", "s");
+    fn parse_simple_grammar() {
+        let parser = EBNFParser::new("s: c c\n c: C c | D", "s");
+        let grammar = parser.parse();
+        let expected_grammar = Grammar {
+            symbol_set: vec![
+                "C".to_string(),
+                "D".to_string(),
+		"c".to_string(),
+                "s".to_string(),
+            ],
+            terminals: vec![/* TODO */],
+            start_symbol: "s".to_string(),
+            productions: vec![
+                Production {
+                    lhs: "s".to_string(),
+                    rhs: vec!["c".to_string(), "c".to_string()],
+                },
+                Production {
+                    lhs: "c".to_string(),
+                    rhs: vec!["C".to_string(), "c".to_string()],
+                },
+                Production {
+                    lhs: "c".to_string(),
+                    rhs: vec!["D".to_string()],
+                },
+            ],
+        };
+        assert_eq!(grammar, expected_grammar);
+    }
+
+    #[test]
+    fn regex_regex() {
+	assert!(REGEXP_RE.is_match(r#"/\"[^"]+\"/"#));
+    }
+
+    #[test]
+    fn parse_json_grammar() {
+        let parser = EBNFParser::new(
+            &fs::read_to_string("./grammars/json.lark").unwrap(),
+            "?start",
+        );
         let grammar = parser.parse();
         println!("{:#?}", grammar);
     }
