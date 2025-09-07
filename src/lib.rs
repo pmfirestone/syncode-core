@@ -16,8 +16,7 @@ model's vocabulary.
 Applying this mask to the model's vocabulary should, provided it was
 constructed with sufficient lookahead, prevent the model from ever going
 outside of the grammar.
-
-!*/
+*/
 pub mod dfa;
 pub mod grammar;
 pub mod lexer;
