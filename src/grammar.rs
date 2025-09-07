@@ -321,11 +321,11 @@ impl EBNFParser {
         if self.cur_pos < self.input_string.len() - 1
             && self.input_string[self.cur_pos..self.cur_pos + 2] == *"->"
         {
-	    // eprintln!("Got ->");
+            // eprintln!("Got ->");
             // We don't actually care about aliases: they only matter to the
             // parse tree that Lark would build if it was using this
             // grammar. Just skip to the end of the line.
-	    self.consume_to_end_of_line();
+            self.consume_to_end_of_line();
         }
         res
     }
@@ -343,7 +343,7 @@ impl EBNFParser {
             if VBAR_RE.is_match(&self.input_string[self.cur_pos..])
                 || self.peek(0) == Some(')')
                 || self.peek(0) == Some(']')
-		|| (self.peek(0) == Some('-') && self.peek(1) == Some('>'))
+                || (self.peek(0) == Some('-') && self.peek(1) == Some('>'))
             {
                 // Break off whenever we reach something that's in the follow set of expr.
                 break;
@@ -494,7 +494,7 @@ impl EBNFParser {
                 };
                 self.consume(matched_string.len());
                 // Trim surounding quotation marks for return value.
-                return matched_string.as_str()[1..matched_string.as_str().len()].to_string();
+                return matched_string.as_str()[1..matched_string.as_str().len() - 1].to_string();
             }
             Some('/') => self.parse_regex(),
             _ => self.parse_name(),
@@ -509,12 +509,16 @@ impl EBNFParser {
         if RULE_RE.is_match(&self.input_string[self.cur_pos..]) {
             let rule_match = RULE_RE.find(&input_string[self.cur_pos..]).unwrap();
             self.consume(rule_match.len());
-	    self.grammar.symbol_set.push(rule_match.as_str().to_string());
+            self.grammar
+                .symbol_set
+                .push(rule_match.as_str().to_string());
             return rule_match.as_str().into();
         } else if TOKEN_RE.is_match(&self.input_string[self.cur_pos..]) {
             let token_match = TOKEN_RE.find(&input_string[self.cur_pos..]).unwrap();
             self.consume(token_match.len());
-	    self.grammar.symbol_set.push(token_match.as_str().to_string());
+            self.grammar
+                .symbol_set
+                .push(token_match.as_str().to_string());
             return token_match.as_str().into();
         } else {
             self.report_parse_error("Expected a RULE or a TOKEN.")
@@ -750,7 +754,7 @@ mod tests {
             symbol_set: vec![
                 "C".to_string(),
                 "D".to_string(),
-		"c".to_string(),
+                "c".to_string(),
                 "s".to_string(),
             ],
             terminals: vec![/* TODO */],
@@ -775,7 +779,7 @@ mod tests {
 
     #[test]
     fn regex_regex() {
-	assert!(REGEXP_RE.is_match(r#"/\"[^"]+\"/"#));
+        assert!(REGEXP_RE.is_match(r#"/\"[^"]+\"/"#));
     }
 
     #[test]
