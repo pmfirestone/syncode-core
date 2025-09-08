@@ -63,7 +63,7 @@ struct EBNFParser {
 // Anchor these to the beginning of the string, because we will be using the regex
 // to pop the terminal off the beginning of the input.
 
-const STRING: &str = r#"^\"(?<content>.*?(\\)*?)\"i?"#;
+const STRING: &str = r#"^\"(?<content>.*?(\\)*?)\"(?<caseinvariant>i?)"#;
 const STRING_RE: Lazy<Regex> = Lazy::new(|| Regex::new(STRING).unwrap());
 const NL: &str = r"^(\r?\n)+\s*";
 const NL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NL).unwrap());
@@ -497,6 +497,7 @@ impl EBNFParser {
     /// This procedure doesn't map neatly onto the grammar: we handle both
     /// literal strings and literal ranges by creating a new terminal.
     fn parse_string(&mut self) -> String {
+	// TODO: Implement case invariance.
         let input_string = self.input_string.clone();
         // self.consume_space();
 
