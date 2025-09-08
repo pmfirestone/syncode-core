@@ -63,7 +63,7 @@ struct EBNFParser {
 // Anchor these to the beginning of the string, because we will be using the regex
 // to pop the terminal off the beginning of the input.
 
-const STRING: &str = r#"^\".*?(\\)*?\"i?"#;
+const STRING: &str = r#"^\"(?<content>.*?(\\)*?)\"i?"#;
 const STRING_RE: Lazy<Regex> = Lazy::new(|| Regex::new(STRING).unwrap());
 const NL: &str = r"^(\r?\n)+\s*";
 const NL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NL).unwrap());
@@ -486,19 +486,56 @@ impl EBNFParser {
     /// Note that template usages will already have been expanded during preprocessing.
     fn parse_value(&mut self) -> String {
         match self.peek(0) {
-            Some('"') => {
-                // TODO: Implement literal ranges.
-                let input_string = self.input_string.clone();
-                let Some(matched_string) = STRING_RE.find(&input_string[self.cur_pos..]) else {
-                    return self.report_parse_error("String never terminated.");
-                };
-                self.consume(matched_string.len());
-                // Trim surounding quotation marks for return value.
-                return matched_string.as_str()[1..matched_string.as_str().len() - 1].to_string();
-            }
+            Some('"') => self.parse_string(),
             Some('/') => self.parse_regex(),
             _ => self.parse_name(),
         }
+    }
+
+    /// Parse a string
+    ///
+    /// This procedure doesn't map neatly onto the grammar: we handle both
+    /// literal strings and literal ranges by creating a new terminal.
+    fn parse_string(&mut self) -> String {
+        let input_string = self.input_string.clone();
+        // self.consume_space();
+
+        let Some(matched_string) = STRING_RE.captures(&input_string[self.cur_pos..]) else {
+            return self.report_parse_error("String ill-formed.");
+        };
+
+        // eprintln!("Matched string: {}", &matched_string["content"]);
+
+        // Make sure we consume the number of characters in the string, not the number of captures!
+        self.consume(matched_string[0].len());
+
+        if self.peek(0) == Some('.') && self.peek(1) == Some('.') {
+            // Literal range!
+            self.consume(2);
+            let Some(second_matched_string) = STRING_RE.captures(&input_string[self.cur_pos..])
+            else {
+                return self.report_parse_error("String ill-formed.");
+            };
+            // Cosntruct new terminal.
+            if !(matched_string["content"].len() == 1
+                && second_matched_string["content"].len() == 1)
+            {
+                self.report_parse_error("The ends of literal ranges should be one character long.");
+            }
+            let first_char: char = matched_string["content"].chars().next().unwrap();
+            let second_char: char = second_matched_string["content"].chars().next().unwrap();
+            if !(first_char < second_char) {
+                self.report_parse_error("Literal ranges should be in ascending order.");
+            }
+            let pattern = format!("[{first_char}-{second_char}]");
+            let new_name = self.new_nonterminal("literal_range");
+            self.grammar.symbol_set.push(new_name.clone());
+            self.grammar
+                .terminals
+                .push(Terminal::new(&new_name, &pattern, self.cur_priority));
+            return new_name;
+        }
+        return matched_string["content"].to_string();
     }
 
     /// Parse a name.
