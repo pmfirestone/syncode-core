@@ -815,8 +815,16 @@ mod tests {
     }
 
     #[test]
-    fn regex_regex() {
-        assert!(REGEXP_RE.is_match(r#"/\"[^"]+\"/"#));
+    fn string_regex() {
+        assert!(STRING_RE.is_match("\"true\""));
+        eprintln!("{:#?}", STRING_RE.captures("\"true\""));
+    }
+
+    #[test]
+    fn parse_string() {
+        let parser = EBNFParser::new(r#"s: "abc""#, "s");
+        let grammar = parser.parse();
+        println!("{:#?}", grammar);
     }
 
     #[test]
