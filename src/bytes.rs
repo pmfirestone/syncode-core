@@ -9,6 +9,7 @@ contains functions for doing this.
 
 use std::collections::HashMap;
 
+use rayon::prelude::*;
 use regex_automata::util::lazy::Lazy;
 
 /// Converts bytes to unicode characters.
@@ -44,5 +45,5 @@ const CHAR_BYTES_MAP: Lazy<HashMap<char, u8>> = Lazy::new(char_bytes);
 ///
 /// WARNING: This is surprisingly slow.
 pub fn restore_bytes(input: &String) -> Vec<u8> {
-    input.chars().map(|c| CHAR_BYTES_MAP[&c]).collect()
+    input.par_chars().map(|c| CHAR_BYTES_MAP[&c]).collect()
 }
