@@ -497,7 +497,7 @@ impl EBNFParser {
     /// This procedure doesn't map neatly onto the grammar: we handle both
     /// literal strings and literal ranges by creating a new terminal.
     fn parse_string(&mut self) -> String {
-	// TODO: Implement case invariance.
+        // TODO: Implement case invariance.
         let input_string = self.input_string.clone();
         // self.consume_space();
 
@@ -536,7 +536,16 @@ impl EBNFParser {
                 .push(Terminal::new(&new_name, &pattern, self.cur_priority));
             return new_name;
         }
-        return matched_string["content"].to_string();
+        let new_name = self.new_nonterminal("literal_string");
+        self.grammar.symbol_set.push(new_name.clone());
+        self.grammar.terminals.push(Terminal::new(
+            &new_name,
+            &regex::escape(&matched_string["content"]),
+            self.cur_priority,
+        ));
+        return new_name;
+
+        // return matched_string["content"].to_string();
     }
 
     /// Parse a name.
@@ -581,8 +590,15 @@ impl EBNFParser {
             return "".into();
         };
         self.consume(re_match.len());
-        // Eat the final slash.
-        re_match.as_str().into()
+        let new_name = self.new_nonterminal("regex");
+        self.grammar.symbol_set.push(new_name.clone());
+        self.grammar.terminals.push(Terminal::new(
+            &new_name,
+            &re_match.as_str(),
+            self.cur_priority,
+        ));
+
+        return new_name;
     }
 
     /// Handle a range of repetitions of the annotated item.
