@@ -6,7 +6,7 @@ use regex_automata::dfa::{Automaton, StartKind, dense};
 use regex_automata::{Anchored, util::start};
 use std::collections::{HashMap, HashSet};
 
-use crate::types::{Terminal, Token};
+use crate::types::*;
 
 /// A type to describe errors that can arise in lexing.
 #[derive(Debug, Clone)]
@@ -25,21 +25,6 @@ pub enum LexError {
     },
     InitError(String),
     RegexError(String),
-}
-
-/// Hold DFAs for the terminals in the grammar.
-#[derive(Clone)]
-struct Scanner {
-    /// The DFA for matching patterns.
-    dfa: dense::DFA<Vec<u32>>,
-    /// Maps DFA match pattern to the TerminalDef it represents.
-    index_to_type: HashMap<usize, Terminal>,
-    /// Maps token type name to whether it can contain newlines.
-    _newline_types: HashSet<String>,
-    /// Terminal definitions for reference.
-    _terminals: Vec<Terminal>,
-    /// All allowed types.
-    pub _allowed_types: HashSet<String>,
 }
 
 impl Scanner {
@@ -97,8 +82,6 @@ impl Scanner {
         Ok(Scanner {
             dfa,
             index_to_type,
-            _newline_types: newline_types,
-            _terminals: sorted_terminals,
             _allowed_types: allowed_types,
         })
     }
@@ -161,19 +144,6 @@ impl Scanner {
 
         None
     }
-}
-
-/// A lexer.
-#[derive(Clone)]
-pub struct Lexer {
-    /// The machinery for the DFAs.
-    scanner: Scanner,
-    /// The terminals this lexer recognizes.
-    pub terminals: Vec<Terminal>,
-    /// The terminals that this lexer ignores.
-    pub ignore_types: HashSet<Terminal>,
-    /// The terminals that contain newlines.
-    pub newline_types: HashSet<Terminal>,
 }
 
 impl Lexer {

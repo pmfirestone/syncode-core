@@ -16,6 +16,9 @@ model's vocabulary.
 Applying this mask to the model's vocabulary should, provided it was
 constructed with sufficient lookahead, prevent the model from ever going
 outside of the grammar.
+
+We make far more of the crate public than is reasonable to facilitate
+development and to document the internals of the crate.
 */
 pub mod bytes;
 pub mod dfa;

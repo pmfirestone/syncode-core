@@ -2,7 +2,6 @@
 //! The mask store for SynCode, implementing the basic algorithm from the paper.
 
 use crate::dfa::all_dfa_states;
-use crate::parser::Parser;
 use crate::types::*;
 use core::iter::Iterator;
 use regex_automata::dfa::dense;

@@ -3,6 +3,17 @@
 Parse [Lark's EBNF](https://lark-parser.readthedocs.io/en/stable/grammar.html)
 and turn it into a `[crate::types::Grammar]` object.
 
+We attempt, as far as possible, to follow the grammar of the Lark
+grammar-description language as specified in the file `lark.lark`. However,
+where the documented features of the language differ from those specified in
+the grammar, we follow the documentation. These deviations are documented in
+the procedures where the implementation is affected; the user is directed to
+Lark's grammar for guidance on the grammar of the language this parser
+excepts. Whereever the behavior of this module differs from the documented
+behavior of Lark, this is a bug in this module. In cases where the behavior of
+the module is underspecified in the grammar, we follow the implementation of
+Lark as closely as is reasonable.
+
 FIXME:
 - Broken parentheses with newlines.
 - Populate remaining fields of grammar object besides `start_symbol` and `productions`.
@@ -26,7 +37,7 @@ enum Item {
 ///
 /// Only one of these structs will exist throughout the life of the program,
 /// and it will be mutated a lot.
-struct EBNFParser {
+pub(crate) struct EBNFParser {
     /// The current position in the input.
     cur_pos: usize,
     /// The ebnf grammar that we are currently parsing.
@@ -81,7 +92,7 @@ const TOKEN: &str = r"^_?[A-Z][_A-Z0-9]*";
 const TOKEN_RE: Lazy<Regex> = Lazy::new(|| Regex::new(TOKEN).unwrap());
 
 impl EBNFParser {
-    fn new(input_string: &str, starting_rule_name: &str) -> Self {
+    pub(crate) fn new(input_string: &str, starting_rule_name: &str) -> Self {
         EBNFParser {
             cur_pos: 0,
             input_string: input_string.into(),
@@ -106,7 +117,7 @@ impl EBNFParser {
     /// always be a production whose right-hand side is a single non-terminal. This
     /// is necessary for the algorithm in `[crate::table]`, which assumes this
     /// characteristic.
-    fn parse(mut self) -> Grammar {
+    pub(crate) fn parse(mut self) -> Grammar {
         // Preprocessing.
         // self.replace_square_brackets();
         // self.expand_templates();
@@ -189,7 +200,12 @@ impl EBNFParser {
             self.report_parse_error("Expected ':'.");
         }
 
-        self.parse_expansions();
+	// We do something different here: tokens are always defined in terms
+	// of other tokens and are non-recursive, despite what the grammar of
+	// the grammar-specification language says. When we parse the grammar,
+	// we simply collect the terminals as they come.
+
+	self.parse_expansions();
 
         // self.cur_rule_name contains the lhs of the production.
         // self.cur_rhs contains the rhs of the production.
@@ -212,12 +228,24 @@ impl EBNFParser {
     ///
     /// Note that %import, %override, and %extend directives will have already
     /// been expanded by the preprocessor by the time this procedure is called.
+    ///
+    /// ```html
+    /// %ignore <TERMINAL>
+    /// ```
+    /// 
+    /// Restricting the argument to %ignore to be a terminal is a deviation
+    /// from the grammar as specified but not as implemented. We follow the
+    /// documentation here, not the grammar specification.
+    /// 
+    /// `%ignore` directives cannot be imported. Imported rules will abide by
+    /// the `%ignore` directives declared in the main grammar.
     fn parse_statement(&mut self) {
         match &self.input_string[self.cur_pos..self.cur_pos + 3] {
             // 3 characters are sufficient to disambiguate.
             "%ig" => {
                 self.consume("%ignore".len());
-                // self.parse_ignore()
+		let token = TOKEN_RE.find(&self.input_string[self.cur_pos..]);
+		// self.grammar.ig
             }
             "%de" => {
                 self.consume("%declare".len());
@@ -802,16 +830,19 @@ mod tests {
 
     #[test]
     fn parse_simple_grammar() {
-        let parser = EBNFParser::new("s: c c\n c: C c | D", "s");
+        let parser = EBNFParser::new("s: c c\n c: \"C\" c | \"D\"", "s");
         let grammar = parser.parse();
         let expected_grammar = Grammar {
             symbol_set: vec![
-                "C".to_string(),
-                "D".to_string(),
                 "c".to_string(),
+                "generated_literal_string_1".to_string(),
+                "generated_literal_string_2".to_string(),
                 "s".to_string(),
             ],
-            terminals: vec![/* TODO */],
+            terminals: vec![
+                Terminal::new("generated_literal_string_1", "C", 0),
+                Terminal::new("generated_literal_string_2", "D", 0),
+            ],
             start_symbol: "s".to_string(),
             productions: vec![
                 Production {
@@ -820,11 +851,11 @@ mod tests {
                 },
                 Production {
                     lhs: "c".to_string(),
-                    rhs: vec!["C".to_string(), "c".to_string()],
+                    rhs: vec!["generated_literal_string_1".to_string(), "c".to_string()],
                 },
                 Production {
                     lhs: "c".to_string(),
-                    rhs: vec!["D".to_string()],
+                    rhs: vec!["generated_literal_string_2".to_string()],
                 },
             ],
         };

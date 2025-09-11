@@ -5,7 +5,6 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use crate::lexer::Lexer;
 use crate::table::tables;
 use crate::types::*;
 
@@ -13,28 +12,6 @@ use crate::types::*;
 // make this module much more readable. Unfortunately, as of 2025-05-09, the
 // behavior is not yet stable. See
 // https://github.com/rust-lang/rfcs/blob/master/text/1733-trait-alias.md.
-
-/// The Parser with its tables.
-///
-/// We do not include the state stack as part of the parser struct, since it is
-/// easier by far to handle this struct as an immutable value and keep the
-/// stack as an argument that is passed in and out for each call.
-#[derive(Clone)]
-pub struct Parser {
-    /// This parser's lexer.
-    // It's not great to have this be part of the Parser, but the logic of
-    // [Parser::parse] requires that the Parser know about the remainder, which
-    // is most easily gotten using the [Lexer] directly.
-    pub lexer: Lexer,
-    /// The action table.
-    pub action_table: ActionTable,
-    /// The goto table.
-    pub goto_table: GotoTable,
-    /// The index of the state to start at.
-    pub start_state: usize,
-    /// The number of lexical tokens we have parsed so far.
-    pub token_index: usize,
-}
 
 impl Parser {
     /// Construct a new parser from a grammar.
@@ -163,23 +140,22 @@ impl Parser {
     }
 
     /// Parse tokens without building a tree, just producing the accept
-    /// sequences and remainder. This is Algorithm 4 from the paper.
+    /// sequences.
     ///
-    /// Take in the partial output the model has generated so far and return
-    /// the accept sequences and the unparsed or lexed remainder.
-    // Don't implement the cache and restore behavior yet; just reparse
-    // from scratch each time. We'll see whether it's a problem in
-    // benchmarking and come back for it if we need to.
+    /// Take in the tokens successfully lexed so far and the remainder, which
+    /// is either the last token, if the end of that token coincides with the
+    /// end of the string generated so far, or the part of the string after the
+    /// end of the last token successfully lexed.
+    ///
+    /// This procedure is like Algorithm 4 from the paper, except that it takes
+    /// in the tokens and remainder and returns only the accept sequences.
     pub fn parse(
         &self,
-        partial_output: &[u8],
-    ) -> Result<(HashSet<Vec<String>>, Token), ParserError> {
+	tokens: Vec<Token>,
+	remainder: Token,
+    ) -> Result<HashSet<Vec<String>>, ParserError> {
         let mut a0: Vec<String> = Vec::new();
         let mut a1: Vec<String> = Vec::new();
-
-        let Ok((tokens, remainder)) = self.lexer.lex(partial_output) else {
-            return Err(ParserError::LexerError);
-        }; // FIXME: return an actually useful error.
 
         let last_token = tokens[tokens.len() - 1].clone();
         let mut state_stack = vec![self.start_state];
@@ -213,7 +189,7 @@ impl Parser {
                 accept_sequences.insert(vec![terminal]);
             }
         }
-        Ok((accept_sequences, remainder))
+        Ok(accept_sequences)
     }
 }
 
@@ -308,7 +284,7 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     use super::*;
-
+    use crate::grammar::EBNFParser;
     // Terminal definitions to be used throughout tests. Commented out ones may
     // come in handy in future tests but are commented to avoid dead code warnings.
     fn word() -> Terminal {
@@ -516,9 +492,12 @@ mod tests {
 
         let input = "A * 2 + 1".as_bytes();
 
-        let Ok((accept_sequences, remainder)) = parser.parse(input) else {
+	let Ok((tokens, remainder)) = parser.lexer.lex(input) else { panic!() };
+	
+        let Ok(accept_sequences) = parser.parse(tokens, remainder.clone()) else {
             panic!()
         };
+
         assert_eq!(
             Token {
                 value: "1".as_bytes().into(),
@@ -584,5 +563,50 @@ mod tests {
             parser.next_terminals(&"L_PAREN".to_string()),
             vec!["R_PAREN".to_string()]
         );
+    }
+
+    #[test]
+    fn parse_simple_grammar() {
+        let grammar = EBNFParser::new("s: c c\nc: \"C\" c | \"D\"", "s").parse();
+        let parser = Parser::new(&grammar);
+        eprintln!("{:#?}", parser.action_table);
+        let Ok((tokens, remainder)) = parser.lexer.lex(b"CC") else { panic!() };
+        eprintln!("{:#?}", parser.parse(tokens, remainder));
+    }
+
+    #[test]
+    fn parse_json() {
+        use crate::grammar::EBNFParser;
+        use std::fs;
+
+        let parser = Parser::new(
+            &EBNFParser::new(
+                &fs::read_to_string("./grammars/json.lark").unwrap(),
+                "?start",
+            )
+            .parse(),
+        );
+
+  //       eprintln!(
+  //           "{:#?}",
+  //           parser.parse(
+  //               r#"{
+  // "basics": {
+  //   "name": "Preston Firestone",
+  //   "label": "Programmer",
+  //   "image": "",
+  //   "email": "pf8@illinois.edu",
+  //   "phone": "+1 (224) 688-2924",
+  //   "summary": "Master's Student in Computer Science",
+  //   "location": {
+  //     "address": "2064 W Hutchinson St APT 1",
+  //     "postalCode": "60618",
+  //     "city": "Chicago",
+  //     "countryCode": "USA",
+  //     "region": "Illinois"
+  //   },"#
+  //               .as_bytes()
+  //           )
+  //       );
     }
 }

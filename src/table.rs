@@ -10,7 +10,6 @@
 //! is work to be done here in cleaning the code and improving its efficiency;
 //! right now the goal is functioning code, nothing more, nothing less.
 
-use std::cell::LazyCell;
 use std::collections::{HashMap, HashSet};
 
 use crate::types::*;

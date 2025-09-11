@@ -9,36 +9,10 @@ use regex_automata::{
 };
 
 use std::cmp::PartialEq;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
 use std::{cell::LazyCell, rc::Rc};
-
-/// A symbol of the grammar is either a terminal or a nonterminal.
-///
-/// Each is identified by a unique number.
-// #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-// pub enum Symbol {
-//     Terminal(usize),
-//     NonTerminal(usize),
-// }
-
-// /// Convenience type bindings to make the definitions of grammars more readable.
-// type Terminal = usize;
-// type NonTerminal = usize;
-
-// /// A grammar has four components.
-// #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-// pub struct Grammar {
-//     /// The set of terminals that are in this grammar.
-//     pub terminals: Vec<Terminal>,
-//     /// The set of nonterminals that are active in this grammar.
-//     pub nonterminals: Vec<NonTerminal>,
-//     /// The first production; this one is the augmented one added to the grammar.
-//     pub start_nonterminal: NonTerminal,
-//     /// The productions that make up this grammar, including the start_production.
-//     pub productions: Vec<(NonTerminal, Vec<Symbol>)>,
-// }
 
 /// A lexical token, what the lexer breaks the input into.
 #[derive(Clone, Debug, PartialEq)]
@@ -115,6 +89,10 @@ pub struct Grammar {
     pub start_symbol: String,
     /// The productions that make up this grammar, including the start_production.
     pub productions: Vec<Production>,
+    // /// The termnals that the lexer should ignore. FIXME: It's an aberration
+    // /// that this is here, because this field is not part of the abstract idea
+    // /// of what a grammar is.
+    // pub ignore_terminals: Vec<Terminal>
 }
 
 /// An item of the item set for LR parsing.
@@ -146,6 +124,52 @@ pub type ActionTable = HashMap<(usize, String), Action>;
 
 /// A goto table is a map from a (state_id, nonterminal) pair to a state_id.
 pub type GotoTable = HashMap<(usize, String), usize>;
+
+/// The Parser with its tables.
+///
+/// We do not include the state stack as part of the parser struct, since it is
+/// easier by far to handle this struct as an immutable value and keep the
+/// stack as an argument that is passed in and out for each call.
+#[derive(Clone)]
+pub struct Parser {
+    /// This parser's lexer.
+    // It's not great to have this be part of the Parser, but the logic of
+    // [Parser::parse] requires that the Parser know about the remainder, which
+    // is most easily gotten using the [Lexer] directly.
+    pub lexer: Lexer,
+    /// The action table.
+    pub action_table: ActionTable,
+    /// The goto table.
+    pub goto_table: GotoTable,
+    /// The index of the state to start at.
+    pub start_state: usize,
+    /// The number of lexical tokens we have parsed so far.
+    pub token_index: usize,
+}
+
+/// Hold DFAs for the terminals in the grammar.
+#[derive(Clone)]
+pub struct Scanner {
+    /// The DFA for matching patterns.
+    pub dfa: dense::DFA<Vec<u32>>,
+    /// Maps DFA match pattern to the TerminalDef it represents.
+    pub index_to_type: HashMap<usize, Terminal>,
+    /// All allowed types.
+    pub _allowed_types: HashSet<String>,
+}
+
+/// A lexer.
+#[derive(Clone)]
+pub struct Lexer {
+    /// The machinery for the DFAs.
+    pub scanner: Scanner,
+    /// The terminals this lexer recognizes.
+    pub terminals: Vec<Terminal>,
+    /// The terminals that this lexer ignores.
+    pub ignore_types: HashSet<Terminal>,
+    /// The terminals that contain newlines.
+    pub newline_types: HashSet<Terminal>,
+}
 
 // Implementations.
 impl Terminal {
