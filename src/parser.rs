@@ -16,16 +16,11 @@ use crate::types::*;
 impl Parser {
     /// Construct a new parser from a grammar.
     pub fn new(grammar: &Grammar) -> Parser {
-        let Ok(lexer) = Lexer::new(grammar.terminals.clone(), HashSet::new()) else {
-            panic!("Could not construct lexer.")
-        };
         let (action_table, goto_table) = tables(grammar.clone());
         Parser {
-            lexer,
             action_table,
             goto_table,
             start_state: 0,
-            token_index: 0,
         }
     }
 
@@ -432,19 +427,10 @@ mod tests {
         let action_table = calc_action_table();
         let goto_table = calc_goto_table();
 
-        let Ok(lexer) = Lexer::new(
-            vec![word(), star(), dec_number(), plus(), space()],
-            HashSet::from([space()]),
-        ) else {
-            panic!()
-        };
-
         Parser {
-            lexer,
             action_table,
             goto_table,
             start_state: 0,
-            token_index: 0,
         }
     }
 
@@ -489,10 +475,16 @@ mod tests {
     #[test]
     fn end_to_end_parse() {
         let parser = calc_parser();
+        let Ok(lexer) = Lexer::new(
+            vec![word(), star(), dec_number(), plus(), space()],
+            HashSet::from([space()]),
+        ) else {
+            panic!()
+        };
 
         let input = "A * 2 + 1".as_bytes();
 
-        let Ok((tokens, remainder)) = parser.lexer.lex(input) else {
+        let Ok((tokens, remainder)) = lexer.lex(input) else {
             panic!()
         };
 
@@ -571,8 +563,11 @@ mod tests {
     fn parse_simple_grammar() {
         let grammar = EBNFParser::new("s: c c\nc: \"C\" c | \"D\"", "s").parse();
         let parser = Parser::new(&grammar);
+        let Ok(lexer) = Lexer::new(grammar.terminals, HashSet::new()) else {
+            panic!()
+        };
         eprintln!("{:#?}", parser.action_table);
-        let Ok((tokens, remainder)) = parser.lexer.lex(b"CC") else {
+        let Ok((tokens, remainder)) = lexer.lex(b"CC") else {
             panic!()
         };
         eprintln!("{:#?}", parser.parse(tokens, remainder));

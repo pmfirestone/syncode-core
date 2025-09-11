@@ -132,19 +132,12 @@ pub type GotoTable = HashMap<(usize, String), usize>;
 /// stack as an argument that is passed in and out for each call.
 #[derive(Clone)]
 pub struct Parser {
-    /// This parser's lexer.
-    // It's not great to have this be part of the Parser, but the logic of
-    // [Parser::parse] requires that the Parser know about the remainder, which
-    // is most easily gotten using the [Lexer] directly.
-    pub lexer: Lexer,
     /// The action table.
     pub action_table: ActionTable,
     /// The goto table.
     pub goto_table: GotoTable,
     /// The index of the state to start at.
     pub start_state: usize,
-    /// The number of lexical tokens we have parsed so far.
-    pub token_index: usize,
 }
 
 /// A lexer.

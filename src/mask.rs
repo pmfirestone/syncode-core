@@ -144,6 +144,7 @@ pub fn dfa_mask_store(
     lexical_terminals: &Vec<Terminal>,
     model_vocabulary: Vec<&[u8]>,
     parser: &Parser,
+    lexer: &Lexer,
     _length_of_terminal_sequences: usize,
 ) -> DFAMaskStore {
     let all_states = all_dfa_states(lexical_terminals);
@@ -155,8 +156,8 @@ pub fn dfa_mask_store(
             let after_next_terminals = parser.next_terminals(next_terminal);
             for after_next_terminal in &after_next_terminals {
                 let accept_sequence = vec![
-                    parser.lexer.get_terminal(next_terminal).unwrap(),
-                    parser.lexer.get_terminal(after_next_terminal).unwrap(),
+                    lexer.get_terminal(next_terminal).unwrap(),
+                    lexer.get_terminal(after_next_terminal).unwrap(),
                 ];
                 let dfa = &terminal.dfa;
                 store.insert(
@@ -390,7 +391,10 @@ mod tests {
             }],
         };
         let parser = Parser::new(&grammar);
-        let store = dfa_mask_store(&lexical_terminals, model_vocabulary, &parser, 2);
+        let Ok(lexer) = Lexer::new(grammar.terminals, HashSet::new()) else {
+            panic!()
+        };
+        let store = dfa_mask_store(&lexical_terminals, model_vocabulary, &parser, &lexer, 2);
         let starting_state = terminal.advance(terminal.start_state(), candidate_string);
         assert_eq!(
             store
