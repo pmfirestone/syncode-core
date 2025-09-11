@@ -147,28 +147,19 @@ pub struct Parser {
     pub token_index: usize,
 }
 
-/// Hold DFAs for the terminals in the grammar.
-#[derive(Clone)]
-pub struct Scanner {
-    /// The DFA for matching patterns.
-    pub dfa: dense::DFA<Vec<u32>>,
-    /// Maps DFA match pattern to the TerminalDef it represents.
-    pub index_to_type: HashMap<usize, Terminal>,
-    /// All allowed types.
-    pub _allowed_types: HashSet<String>,
-}
-
 /// A lexer.
 #[derive(Clone)]
 pub struct Lexer {
-    /// The machinery for the DFAs.
-    pub scanner: Scanner,
     /// The terminals this lexer recognizes.
     pub terminals: Vec<Terminal>,
     /// The terminals that this lexer ignores.
     pub ignore_types: HashSet<Terminal>,
     /// The terminals that contain newlines.
     pub newline_types: HashSet<Terminal>,
+    /// The DFA for matching patterns.
+    pub dfa: dense::DFA<Vec<u32>>,
+    /// Maps DFA match pattern to the TerminalDef it represents.
+    pub index_to_type: HashMap<usize, Terminal>,
 }
 
 // Implementations.

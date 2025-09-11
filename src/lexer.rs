@@ -27,25 +27,30 @@ pub enum LexError {
     RegexError(String),
 }
 
-impl Scanner {
-    pub fn new(terminals: Vec<Terminal>) -> Result<Self, LexError> {
-        let mut newline_types = HashSet::new();
-        let mut allowed_types = HashSet::with_capacity(terminals.len());
-        let mut index_to_type = HashMap::with_capacity(terminals.len());
-
+impl Lexer {
+    /// Construct a new lexer that recognizes the given `terminals` and ignores
+    /// the `ignore_types`.
+    ///
+    /// Note that all members of `ignore_types` must also be in `terminals`:
+    /// otherwise they won't be recognized at all. This is perhaps suboptimal
+    /// API design.
+    pub fn new(
+        terminals: Vec<Terminal>,
+        ignore_types: HashSet<Terminal>,
+    ) -> Result<Self, LexError> {
         // Determine which patterns might contain newlines
-        for terminal in &terminals {
-            let pattern_str = &terminal.pattern;
-            if pattern_str.contains("\\n")
-                || pattern_str.contains("\n")
-                || pattern_str.contains("\\s")
-                || pattern_str.contains("[^")
-                || (pattern_str.contains(".") && pattern_str.contains("(?s"))
-            {
-                newline_types.insert(terminal.name.clone());
-            }
+        let mut newline_types: HashSet<Terminal> = HashSet::new();
+        let mut index_to_type: HashMap<usize, Terminal> = HashMap::new();
 
-            allowed_types.insert(terminal.name.clone());
+        for terminal in &terminals {
+            if terminal.pattern.contains("\\n")
+                || terminal.pattern.contains("\n")
+                || terminal.pattern.contains("\\s")
+                || terminal.pattern.contains("[^")
+                || (terminal.pattern.contains(".") && terminal.pattern.contains("(?s"))
+            {
+                newline_types.insert(terminal.clone());
+            }
         }
 
         // Sort terminals by priority (highest first)
@@ -79,11 +84,23 @@ impl Scanner {
             .build_many(&patterns)
             .map_err(|e| LexError::RegexError(format!("Failed to build DFA: {}", e)))?;
 
-        Ok(Scanner {
+        Ok(Lexer {
+            terminals,
+            ignore_types,
+            newline_types,
             dfa,
             index_to_type,
-            _allowed_types: allowed_types,
         })
+    }
+
+    /// Get the Terminal object of this name, if there is one.
+    pub fn get_terminal(&self, name: &String) -> Result<Terminal, ()> {
+        for terminal in &self.terminals {
+            if terminal.name == *name {
+                return Ok(terminal.clone());
+            }
+        }
+        Err(())
     }
 
     /// Match the next token in the input, beginning at position pos, and
@@ -144,53 +161,6 @@ impl Scanner {
 
         None
     }
-}
-
-impl Lexer {
-    /// Construct a new lexer that recognizes the given `terminals` and ignores
-    /// the `ignore_types`.
-    ///
-    /// Note that all members of `ignore_types` must also be in `terminals`:
-    /// otherwise they won't be recognized at all. This is perhaps suboptimal
-    /// API design.
-    pub fn new(
-        terminals: Vec<Terminal>,
-        ignore_types: HashSet<Terminal>,
-    ) -> Result<Self, LexError> {
-        // Determine which patterns might contain newlines
-        let mut newline_types: HashSet<Terminal> = HashSet::new();
-        for terminal in &terminals {
-            if terminal.pattern.contains("\\n")
-                || terminal.pattern.contains("\n")
-                || terminal.pattern.contains("\\s")
-                || terminal.pattern.contains("[^")
-                || (terminal.pattern.contains(".") && terminal.pattern.contains("(?s"))
-            {
-                newline_types.insert(terminal.clone());
-            }
-        }
-
-        // Create scanner
-        match Scanner::new(terminals.clone()) {
-            Ok(scanner) => Ok(Lexer {
-                scanner,
-                terminals,
-                ignore_types,
-                newline_types,
-            }),
-            Err(e) => Err(e),
-        }
-    }
-
-    /// Get the Terminal object of this name, if there is one.
-    pub fn get_terminal(&self, name: &String) -> Result<Terminal, ()> {
-        for terminal in &self.terminals {
-            if terminal.name == *name {
-                return Ok(terminal.clone());
-            }
-        }
-        Err(())
-    }
 
     /// Get the next token from text, updating pos, line, and column to the end
     /// of the new token. Return a flag saying whether or not this token is the remainder.
@@ -211,7 +181,7 @@ impl Lexer {
     ) -> Result<(Token, bool), LexError> {
         loop {
             // Try to match next token
-            if let Some((value, terminal)) = self.scanner.match_token(text.into(), pos) {
+            if let Some((value, terminal)) = self.match_token(text.into(), pos) {
                 let ignored = self.ignore_types.contains(terminal);
 
                 // If this token is ignored, update position and continue the loop

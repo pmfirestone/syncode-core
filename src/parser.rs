@@ -151,8 +151,8 @@ impl Parser {
     /// in the tokens and remainder and returns only the accept sequences.
     pub fn parse(
         &self,
-	tokens: Vec<Token>,
-	remainder: Token,
+        tokens: Vec<Token>,
+        remainder: Token,
     ) -> Result<HashSet<Vec<String>>, ParserError> {
         let mut a0: Vec<String> = Vec::new();
         let mut a1: Vec<String> = Vec::new();
@@ -492,8 +492,10 @@ mod tests {
 
         let input = "A * 2 + 1".as_bytes();
 
-	let Ok((tokens, remainder)) = parser.lexer.lex(input) else { panic!() };
-	
+        let Ok((tokens, remainder)) = parser.lexer.lex(input) else {
+            panic!()
+        };
+
         let Ok(accept_sequences) = parser.parse(tokens, remainder.clone()) else {
             panic!()
         };
@@ -570,7 +572,9 @@ mod tests {
         let grammar = EBNFParser::new("s: c c\nc: \"C\" c | \"D\"", "s").parse();
         let parser = Parser::new(&grammar);
         eprintln!("{:#?}", parser.action_table);
-        let Ok((tokens, remainder)) = parser.lexer.lex(b"CC") else { panic!() };
+        let Ok((tokens, remainder)) = parser.lexer.lex(b"CC") else {
+            panic!()
+        };
         eprintln!("{:#?}", parser.parse(tokens, remainder));
     }
 
@@ -587,26 +591,26 @@ mod tests {
             .parse(),
         );
 
-  //       eprintln!(
-  //           "{:#?}",
-  //           parser.parse(
-  //               r#"{
-  // "basics": {
-  //   "name": "Preston Firestone",
-  //   "label": "Programmer",
-  //   "image": "",
-  //   "email": "pf8@illinois.edu",
-  //   "phone": "+1 (224) 688-2924",
-  //   "summary": "Master's Student in Computer Science",
-  //   "location": {
-  //     "address": "2064 W Hutchinson St APT 1",
-  //     "postalCode": "60618",
-  //     "city": "Chicago",
-  //     "countryCode": "USA",
-  //     "region": "Illinois"
-  //   },"#
-  //               .as_bytes()
-  //           )
-  //       );
+        //       eprintln!(
+        //           "{:#?}",
+        //           parser.parse(
+        //               r#"{
+        // "basics": {
+        //   "name": "Preston Firestone",
+        //   "label": "Programmer",
+        //   "image": "",
+        //   "email": "pf8@illinois.edu",
+        //   "phone": "+1 (224) 688-2924",
+        //   "summary": "Master's Student in Computer Science",
+        //   "location": {
+        //     "address": "2064 W Hutchinson St APT 1",
+        //     "postalCode": "60618",
+        //     "city": "Chicago",
+        //     "countryCode": "USA",
+        //     "region": "Illinois"
+        //   },"#
+        //               .as_bytes()
+        //           )
+        //       );
     }
 }

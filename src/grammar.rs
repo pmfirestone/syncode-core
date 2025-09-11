@@ -200,12 +200,12 @@ impl EBNFParser {
             self.report_parse_error("Expected ':'.");
         }
 
-	// We do something different here: tokens are always defined in terms
-	// of other tokens and are non-recursive, despite what the grammar of
-	// the grammar-specification language says. When we parse the grammar,
-	// we simply collect the terminals as they come.
+        // We do something different here: tokens are always defined in terms
+        // of other tokens and are non-recursive, despite what the grammar of
+        // the grammar-specification language says. When we parse the grammar,
+        // we simply collect the terminals as they come.
 
-	self.parse_expansions();
+        self.parse_expansions();
 
         // self.cur_rule_name contains the lhs of the production.
         // self.cur_rhs contains the rhs of the production.
@@ -232,11 +232,11 @@ impl EBNFParser {
     /// ```html
     /// %ignore <TERMINAL>
     /// ```
-    /// 
+    ///
     /// Restricting the argument to %ignore to be a terminal is a deviation
     /// from the grammar as specified but not as implemented. We follow the
     /// documentation here, not the grammar specification.
-    /// 
+    ///
     /// `%ignore` directives cannot be imported. Imported rules will abide by
     /// the `%ignore` directives declared in the main grammar.
     fn parse_statement(&mut self) {
@@ -244,8 +244,8 @@ impl EBNFParser {
             // 3 characters are sufficient to disambiguate.
             "%ig" => {
                 self.consume("%ignore".len());
-		let token = TOKEN_RE.find(&self.input_string[self.cur_pos..]);
-		// self.grammar.ig
+                let token = TOKEN_RE.find(&self.input_string[self.cur_pos..]);
+                // self.grammar.ig
             }
             "%de" => {
                 self.consume("%declare".len());
