@@ -128,7 +128,7 @@ impl EBNFParser {
     /// always be a production whose right-hand side is a single non-terminal. This
     /// is necessary for the algorithm in `[crate::table]`, which assumes this
     /// characteristic.
-    pub(crate) fn parse(mut self) -> Result<(Grammar, Lexer), ()> {
+    pub(crate) fn parse(mut self) -> Result<Grammar, ()> {
         // Preprocessing.
         // self.replace_square_brackets();
         // self.expand_templates();
@@ -157,28 +157,20 @@ impl EBNFParser {
         self.grammar.symbol_set.sort();
         self.grammar.symbol_set.dedup();
 
-        let mut ignore_terminals: HashSet<Terminal> = HashSet::new();
+        // Make ignore terminals ignored, if any.
+        if !self.ignore_terminals.is_empty() {
+            let ignore_nonterminal = self.make_ignore_nonterminal();
+            let mut new_productions: Vec<Production> = vec![];
 
-        // // Make ignore terminals terminals of the grammar.
-        // for ignore_terminal in self.ignore_terminals {
-        //     // Find the production(s) in the grammar whose lhs is this terminal.
-        //     let mut productions_to_squish = vec![];
-        //     for production in &self.grammar.productions {
-        //         if production.lhs == ignore_terminal {
-        //             productions_to_squish.push(production);
-        //         }
-        //     }
+            for production in &self.grammar.productions {
+                new_productions
+                    .push(self.insert_nonterminal(production.clone(), ignore_nonterminal.clone()))
+            }
 
-        //     let mut regex = String::new();
+	    self.grammar.productions = new_productions;
+        }
 
-        //     // Make a new terminal out of that regular expression and push it to the ignore terminals.
-        // }
-
-        let Ok(lexer) = Lexer::new(self.grammar.terminals.clone(), ignore_terminals) else {
-            return Err(());
-        };
-
-        Ok((self.grammar, lexer))
+        Ok(self.grammar)
     }
 
     /// Parse a rule.
@@ -615,37 +607,14 @@ impl EBNFParser {
             );
         }
 
-        // match self.cur_parsing {
-        //     Item::RULE => {
-                // Encountered a string literal while parsing a rule; make a new anonymous terminal.
-                let new_name = self.new_nonterminal("__ANONYMOUS_LITERAL");
-                self.grammar.symbol_set.push(new_name.clone());
-                self.grammar
-                    .terminals
-                    .push(Terminal::new(&new_name, &pattern, self.cur_priority));
+        // Encountered a string literal; make a new anonymous terminal.
+        let new_name = self.new_nonterminal("__ANONYMOUS_LITERAL");
+        self.grammar.symbol_set.push(new_name.clone());
+        self.grammar
+            .terminals
+            .push(Terminal::new(&new_name, &pattern, self.cur_priority));
 
-                return new_name;
-        //     }
-        //     Item::TOKEN => {
-        //         // Encountered a sring literal while parsing a token; return the new sring.
-        //         return pattern;
-        //     }
-        //     Item::STATEMENT => {
-        //         // %override or %extend.
-        //         return "".to_string();
-        //     }
-        // }
-
-        // let new_name = self.new_nonterminal("literal_string");
-        // self.grammar.symbol_set.push(new_name.clone());
-        // self.grammar.terminals.push(Terminal::new(
-        //     &new_name,
-        //     &regex::escape(&matched_string["content"]),
-        //     self.cur_priority,
-        // ));
-        // return new_name;
-
-        // return matched_string["content"].to_string();
+        return new_name;
     }
 
     /// Parse a name.
@@ -690,30 +659,16 @@ impl EBNFParser {
             return "".into();
         };
         self.consume(re_match.len());
-        // match self.cur_parsing {
-            // Item::RULE => {
-                // Encountered a literal in the process of parsing a rule; make
-                // a new anonymous terminal.
-                let new_name = self.new_nonterminal("__REGEX");
-                self.grammar.symbol_set.push(new_name.clone());
-                self.grammar.terminals.push(Terminal::new(
-                    &new_name,
-                    &re_match.as_str(),
-                    self.cur_priority,
-                ));
+        // Make a new anonymous terminal.
+        let new_name = self.new_nonterminal("__REGEX");
+        self.grammar.symbol_set.push(new_name.clone());
+        self.grammar.terminals.push(Terminal::new(
+            &new_name,
+            &re_match.as_str(),
+            self.cur_priority,
+        ));
 
-                return new_name;
-        //     }
-        //     Item::TOKEN => {
-        //         // Encountered a regex while parsing a token; return the regex
-        //         // as is.
-        //         return re_match.as_str().to_string();
-        //     }
-        //     Item::STATEMENT => {
-        //         // Either %override or %extend. TODO: Implement
-        //         return "".to_string();
-        //     }
-        // }
+        return new_name;
     }
 
     /// Handle a range of repetitions of the annotated item.
@@ -836,6 +791,40 @@ impl EBNFParser {
     /// but that is probably the most common use case.
     fn expand_extends(&mut self) {}
 
+    /// Make the new nonterminal of the terminals to ignore.
+    ///
+    /// This new nonterminal is defined as:
+    /// ```
+    /// new_nonterm: (ignore_terminal1 | ... | ignore_terminaln)*
+    /// ```
+    fn make_ignore_nonterminal(&mut self) -> String {
+        let new_nonterminal = self.new_nonterminal("__IGNORE");
+        for ignore in &self.ignore_terminals {
+            self.grammar.productions.push(Production {
+                lhs: new_nonterminal.clone(),
+                rhs: vec![new_nonterminal.clone(), ignore.clone()],
+            });
+        }
+        self.grammar.productions.push(Production {
+            lhs: new_nonterminal.clone(),
+            rhs: vec!["".to_string()],
+        });
+        new_nonterminal
+    }
+
+    /// Insert a non-terminal between each nonterminal on the right-hand side of a production.
+    fn insert_nonterminal(&self, production: Production, non_terminal: String) -> Production {
+        let mut new_rhs = vec![non_terminal.clone()];
+        for symbol in production.rhs {
+            new_rhs.push(symbol);
+            new_rhs.push(non_terminal.clone());
+        }
+        Production {
+            lhs: production.lhs,
+            rhs: new_rhs,
+        }
+    }
+
     /// Consume the specified number of characters, maintaining line and column number.
     fn consume(&mut self, count: usize) {
         for _ in 0..count {
@@ -918,14 +907,14 @@ mod tests {
     #[test]
     fn parse_simple_grammar() {
         let parser = EBNFParser::new("s: c c\n c: \"C\" c | \"D\"", "s");
-        let Ok((grammar, lexer)) = parser.parse() else {
+        let Ok(grammar) = parser.parse() else {
             panic!()
         };
         let expected_grammar = Grammar {
             symbol_set: vec![
                 "__ANONYMOUS_LITERAL_1".to_string(),
                 "__ANONYMOUS_LITERAL_2".to_string(),
-		"c".to_string(),
+                "c".to_string(),
                 "s".to_string(),
             ],
             terminals: vec![
@@ -978,6 +967,6 @@ mod tests {
             "start",
         );
         let grammar = parser.parse();
-        println!("{:#?}", grammar.unwrap().0);
+        println!("{:#?}", grammar.unwrap());
     }
 }
