@@ -540,7 +540,7 @@ mod tests {
                 Terminal::new("L_PAREN", r"\(", 0),
                 Terminal::new("R_PAREN", r"\)", 0),
                 Terminal::new("IDENTIFIER", r"[a-zA-Z_]*", 0),
-		Terminal::new("$", "", 0)
+                Terminal::new("$", "", 0),
             ],
             start_symbol: "start".to_string(),
             productions: vec![Production {
@@ -562,12 +562,14 @@ mod tests {
 
     #[test]
     fn parse_simple_grammar() {
-        let Ok((grammar, lexer)) = EBNFParser::new("s: c c\nc: \"C\" c | \"D\"", "s").parse()
-        else {
+        let Ok(grammar) = EBNFParser::new("s: c c\nc: \"C\" c | \"D\"", "s").parse() else {
             panic!()
         };
         let parser = Parser::new(&grammar);
         eprintln!("{:#?}", parser.action_table);
+        let Ok(lexer) = Lexer::new(grammar.terminals, HashSet::new()) else {
+            panic!();
+        };
         let Ok((tokens, remainder)) = lexer.lex(b"CC") else {
             panic!()
         };
@@ -579,7 +581,7 @@ mod tests {
         use crate::grammar::EBNFParser;
         use std::fs;
 
-        let Ok((grammar, lexer)) = &EBNFParser::new(
+        let Ok(grammar) = &EBNFParser::new(
             &fs::read_to_string("./grammars/json.lark").unwrap(),
             "start",
         )

@@ -23,10 +23,9 @@ const AUGMENTED_START_SYMBOL: &str = "supersecretnewstart";
 
 /// Check whether a given symbol is a terminal in this grammar.
 pub(crate) fn is_terminal(symbol: &String, _grammar: &Grammar) -> bool {
-    // eprintln!("{symbol}");
-    // symbol.to_ascii_uppercase() == *symbol
+    // eprintln!("symbol: {symbol}");
     for terminal in &_grammar.terminals {
-	// eprintln!("{terminal}");
+        // eprintln!("{terminal}");
         if *symbol == terminal.name {
             return true;
         }
@@ -39,6 +38,7 @@ pub(crate) fn is_terminal(symbol: &String, _grammar: &Grammar) -> bool {
 /// The algorithm comes from sec. 4.4.2 of the Dragon Book 2e, p. 221.
 fn symbol_first(symbol: &String, grammar: &Grammar) -> HashSet<String> {
     if is_terminal(symbol, grammar) {
+        // eprintln!("terminal: {symbol}");
         // If symbol is a terminal, then first(symbol) = {symbol}.
         return HashSet::from([symbol.clone()]);
     } else {
@@ -77,6 +77,7 @@ fn symbol_first(symbol: &String, grammar: &Grammar) -> HashSet<String> {
 /// in FIRST(X1) and FIRST(X2) and so on. Finally add to FIRST(X1X2...Xn) if
 /// for all i 𝜖 is in FIRST(Xi).
 fn string_first(string: Vec<String>, grammar: &Grammar) -> HashSet<String> {
+    // eprintln!("string_first: {:#?}", string);
     let mut first_set: HashSet<String> = HashSet::new();
     let string_length = string.len();
     for (idx, outer_symbol) in string.into_iter().enumerate() {
@@ -114,7 +115,9 @@ fn closure(items: HashSet<Item>, grammar: &Grammar) -> HashSet<Item> {
     'repeat: loop {
         let old_item_set = item_set.clone();
         for item in item_set.clone() {
+            // eprintln!("item: {:#?}", item);
             for production in &grammar.productions {
+                // eprintln!("production: {:#?}", production);
                 if item.dot == item.production.rhs.len() {
                     // We only want productions that don't have the dot at the
                     // end (and to avoid a panic when indexing at the next
@@ -221,7 +224,7 @@ fn action_table(grammar: &Grammar) -> ActionTable {
                 if is_terminal(&item.production.rhs[item.dot], &grammar) {
                     // ...where a is a terminal...
                     let terminal = &item.production.rhs[item.dot];
-                    eprintln!("is_terminal: {terminal}");
+                    // eprintln!("is_terminal: {terminal}");
                     // and goto(item_set_i, a) = item_set_j...
                     let goto_item_set = goto(&item_set, &terminal.clone(), &grammar);
                     let Ok(goto_state_id) = find_state_id(&goto_item_set, &item_sets) else {
@@ -238,7 +241,7 @@ fn action_table(grammar: &Grammar) -> ActionTable {
                     );
                 } else {
                     // The next symbol is not a terminal, so ignore it.
-                    eprintln!("not a terminal: {}", item.production.rhs[item.dot]);
+                    // eprintln!("not a terminal: {}", item.production.rhs[item.dot]);
                 }
             }
             // If [A -> ɑ·, a] is in item_set_i, A != AUGMENTED_START_SYMBOL,
