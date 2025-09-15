@@ -23,10 +23,14 @@ TODO:
 - Implement directives.
 !*/
 
+use std::collections::HashSet;
+
+use crate::table::is_terminal;
 use crate::types::*;
 use regex::Regex;
 use regex_automata::util::lazy::Lazy;
 
+#[derive(PartialEq)]
 enum Item {
     RULE,
     TOKEN,
@@ -61,6 +65,11 @@ pub(crate) struct EBNFParser {
     cur_parsing: Item,
     /// A nonce value to use for generating unique new non-terminal names.
     nonce: usize,
+    /// A temporary home for the terminals to ignore while we parse the grammar.
+    ignore_terminals: Vec<String>,
+    /// A temporary home for terminals while we pars the grammar, before we
+    /// dissolve them into regular expressions.
+    temporary_terminals: Vec<Production>,
 }
 
 /// The terminals of the grammar description language.
@@ -86,7 +95,7 @@ const VBAR: &str = r"^((\r?\n)+\s*)?\|";
 const VBAR_RE: Lazy<Regex> = Lazy::new(|| Regex::new(VBAR).unwrap());
 const NUMBER: &str = r"^(+|-)?[0-9]+";
 const NUMBER_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NUMBER).unwrap());
-const RULE: &str = r"^!?[_?]?[a-z][_a-z0-9]*";
+const RULE: &str = r"^!?[_?]?(?<name>[a-z][_a-z0-9]*)";
 const RULE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(RULE).unwrap());
 const TOKEN: &str = r"^_?[A-Z][_A-Z0-9]*";
 const TOKEN_RE: Lazy<Regex> = Lazy::new(|| Regex::new(TOKEN).unwrap());
@@ -102,6 +111,7 @@ impl EBNFParser {
                 symbol_set: vec![],
                 start_symbol: starting_rule_name.into(),
             },
+            temporary_terminals: vec![],
             cur_line: 1,
             cur_column: 1,
             name_stack: vec![],
@@ -109,15 +119,16 @@ impl EBNFParser {
             cur_rhs: vec![],
             cur_parsing: Item::RULE,
             nonce: 0,
+            ignore_terminals: vec![],
         }
     }
-    /// Parse input_string into a Grammar.
+    /// Parse input_string into a Grammar and a Lexer.
     ///
     /// The grammar will be "augmented", which means that the start rule will
     /// always be a production whose right-hand side is a single non-terminal. This
     /// is necessary for the algorithm in `[crate::table]`, which assumes this
     /// characteristic.
-    pub(crate) fn parse(mut self) -> Grammar {
+    pub(crate) fn parse(mut self) -> Result<(Grammar, Lexer), ()> {
         // Preprocessing.
         // self.replace_square_brackets();
         // self.expand_templates();
@@ -134,13 +145,40 @@ impl EBNFParser {
                 self.parse_rule();
             } else if TOKEN_RE.is_match(&self.input_string[self.cur_pos..]) {
                 self.parse_token();
+            } else if self.peek(0) == Some('%') {
+                self.parse_statement();
             } else {
                 self.report_parse_error("Invalid item.");
             }
+            self.consume_space();
         }
+
+        // Ensure symbols are unique.
         self.grammar.symbol_set.sort();
         self.grammar.symbol_set.dedup();
-        self.grammar
+
+        let mut ignore_terminals: HashSet<Terminal> = HashSet::new();
+
+        // // Make ignore terminals terminals of the grammar.
+        // for ignore_terminal in self.ignore_terminals {
+        //     // Find the production(s) in the grammar whose lhs is this terminal.
+        //     let mut productions_to_squish = vec![];
+        //     for production in &self.grammar.productions {
+        //         if production.lhs == ignore_terminal {
+        //             productions_to_squish.push(production);
+        //         }
+        //     }
+
+        //     let mut regex = String::new();
+
+        //     // Make a new terminal out of that regular expression and push it to the ignore terminals.
+        // }
+
+        let Ok(lexer) = Lexer::new(self.grammar.terminals.clone(), ignore_terminals) else {
+            return Err(());
+        };
+
+        Ok((self.grammar, lexer))
     }
 
     /// Parse a rule.
@@ -152,11 +190,15 @@ impl EBNFParser {
     fn parse_rule(&mut self) {
         // We know there's a match because this method is only called after
         // we've already determined that the next thing is a rule.
-        let rule_match = RULE_RE.find(&self.input_string[self.cur_pos..]).unwrap();
+        // Remove the leading ? or !, if any, because we don't care about it.
+        let rule_match = RULE_RE
+            .captures(&self.input_string[self.cur_pos..])
+            .unwrap();
         // eprintln!("{:?}", rule_match);
         self.cur_parsing = Item::RULE;
-        self.name_stack.push(rule_match.as_str().into());
-        self.consume(rule_match.len());
+        // Remove the leading ? or !, if any, because we don't care about it.
+        self.name_stack.push(rule_match["name"].into());
+        self.consume(rule_match[0].len());
 
         self.consume_space();
 
@@ -180,7 +222,7 @@ impl EBNFParser {
 
     /// Parse a token.
     ///
-    /// `token: TOKEN priority? ":" expansions`
+    /// `token: TOKEN priority? ":" <literals-and-or-terminals>`
     ///
     /// Note that the params that are present in the syntax have already been
     /// expanded by the time this procedure is called.
@@ -200,18 +242,31 @@ impl EBNFParser {
             self.report_parse_error("Expected ':'.");
         }
 
+        self.consume_space();
+
+        // match self.peek(0) {
+        //     Some('"') => { // string
+        //         // Process this string or literal range.
+        //     }
+        //     Some('/') => {
+        //         // regex
+        //         let regex = self.parse_regex();
+        //     }
+        //     Some('A'..'Z') => { // terminal
+        //     }
+        //     _ => { // error
+        //     }
+        // }
+
         // We do something different here: tokens are always defined in terms
-        // of other tokens and are non-recursive, despite what the grammar of
-        // the grammar-specification language says. When we parse the grammar,
+        // of other tokens and are non-recursive. When we parse the grammar,
         // we simply collect the terminals as they come.
 
         self.parse_expansions();
 
-        // self.cur_rule_name contains the lhs of the production.
-        // self.cur_rhs contains the rhs of the production.
-        // self.grammar.terminals.push(Production {
-        //     lhs: self..clone(),
-        //     rhs: self.cur_rhs.clone(),
+        // self.temporary_terminals.push(Production {
+        //     lhs: self.name_stack.last().unwrap().to_string(),
+        //     rhs: vec![]
         // });
 
         // We are no longer parsing a token.
@@ -227,7 +282,7 @@ impl EBNFParser {
     /// ```
     ///
     /// Note that %import, %override, and %extend directives will have already
-    /// been expanded by the preprocessor by the time this procedure is called.
+    /// been expanded by the preprocessor by ;the time this procedure is called.
     ///
     /// ```html
     /// %ignore <TERMINAL>
@@ -244,8 +299,13 @@ impl EBNFParser {
             // 3 characters are sufficient to disambiguate.
             "%ig" => {
                 self.consume("%ignore".len());
-                let token = TOKEN_RE.find(&self.input_string[self.cur_pos..]);
-                // self.grammar.ig
+                self.consume_space();
+                let Some(token) = TOKEN_RE.find(&self.input_string[self.cur_pos..]) else {
+                    self.report_parse_error("Expected token after %ignore statement.");
+                    return;
+                };
+                self.ignore_terminals.push(token.as_str().to_string());
+                self.consume(token.as_str().len());
             }
             "%de" => {
                 self.consume("%declare".len());
@@ -294,34 +354,14 @@ impl EBNFParser {
         loop {
             let cur_alias = self.parse_alias();
             // eprintln!("cur_alias: {:?}", cur_alias);
-            match self.cur_parsing {
-                Item::RULE => {
-                    // Push a new production to the set of productions.
-                    self.grammar.productions.push(Production {
-                        lhs: self.name_stack.last().unwrap().to_string(),
-                        rhs: cur_alias,
-                    });
-                    self.grammar
-                        .symbol_set
-                        .push(self.name_stack.last().unwrap().to_string());
-                }
-                Item::TOKEN => {
-                    // Push a new terminal to the set of terminals.
-                    //
-                    // HELP: In Lark's EBNF, tokens do not have to be just a
-                    // regex: they can contain arbitrary EBNF statements on
-                    // their right-hand side. The remainder of SynCode's logic
-                    // assumes that terminals are each a single regex, an
-                    // requirement not enforced by Lark's syntax.
-                    // self.grammar.terminals.push(Production {
-                    //     lhs: self.name_stack.last().unwrap().to_string(),
-                    //     rhs: cur_alias,
-                    // });
-                }
-                _ => {
-                    // Shouldn't reach this except in case of syntax error in input.
-                }
-            }
+
+            self.grammar.productions.push(Production {
+                lhs: self.name_stack.last().unwrap().to_string(),
+                rhs: cur_alias,
+            });
+            self.grammar
+                .symbol_set
+                .push(self.name_stack.last().unwrap().to_string());
 
             // If there's another alias, parse it.
             // self.consume_space();
@@ -412,7 +452,7 @@ impl EBNFParser {
                     // and add X = $\epsilon$ | X E.
                     self.grammar.productions.push(Production {
                         lhs: new_nonterm.clone(),
-                        rhs: vec![],
+                        rhs: vec!["".to_string()],
                     });
                     self.grammar.productions.push(Production {
                         lhs: new_nonterm.clone(),
@@ -436,7 +476,7 @@ impl EBNFParser {
                     // add X = $\epsilon$ | E.
                     self.grammar.productions.push(Production {
                         lhs: new_nonterm.clone(),
-                        rhs: vec![],
+                        rhs: vec!["".to_string()],
                     });
                     self.grammar.productions.push(Production {
                         lhs: new_nonterm.clone(),
@@ -535,8 +575,11 @@ impl EBNFParser {
 
         // eprintln!("Matched string: {}", &matched_string["content"]);
 
-        // Make sure we consume the number of characters in the string, not the number of captures!
+        // Make sure we consume the number of characters in the string, not the
+        // number of captures!
         self.consume(matched_string[0].len());
+
+        let pattern: String;
 
         if self.peek(0) == Some('.') && self.peek(1) == Some('.') {
             // Literal range!
@@ -545,33 +588,62 @@ impl EBNFParser {
             else {
                 return self.report_parse_error("String ill-formed.");
             };
-            // Cosntruct new terminal.
+
+            // Construct new terminal.
             if !(matched_string["content"].len() == 1
                 && second_matched_string["content"].len() == 1)
             {
                 self.report_parse_error("The ends of literal ranges should be one character long.");
             }
+            self.consume(second_matched_string[0].len());
+
             let first_char: char = matched_string["content"].chars().next().unwrap();
             let second_char: char = second_matched_string["content"].chars().next().unwrap();
+
             if !(first_char < second_char) {
                 self.report_parse_error("Literal ranges should be in ascending order.");
             }
-            let pattern = format!("[{first_char}-{second_char}]");
-            let new_name = self.new_nonterminal("literal_range");
-            self.grammar.symbol_set.push(new_name.clone());
-            self.grammar
-                .terminals
-                .push(Terminal::new(&new_name, &pattern, self.cur_priority));
-            return new_name;
+
+            pattern = format!(
+                "[{first_char}-{second_char}]",
+                // matched_string.name("caseinvariant").unwrap_or("").as_str()
+            );
+        } else {
+            // Just a string alone.
+            pattern = regex::escape(
+                &matched_string["content"], // + matched_string.name("caseinvariant").unwrap_or("")
+            );
         }
-        let new_name = self.new_nonterminal("literal_string");
-        self.grammar.symbol_set.push(new_name.clone());
-        self.grammar.terminals.push(Terminal::new(
-            &new_name,
-            &regex::escape(&matched_string["content"]),
-            self.cur_priority,
-        ));
-        return new_name;
+
+        // match self.cur_parsing {
+        //     Item::RULE => {
+                // Encountered a string literal while parsing a rule; make a new anonymous terminal.
+                let new_name = self.new_nonterminal("__ANONYMOUS_LITERAL");
+                self.grammar.symbol_set.push(new_name.clone());
+                self.grammar
+                    .terminals
+                    .push(Terminal::new(&new_name, &pattern, self.cur_priority));
+
+                return new_name;
+        //     }
+        //     Item::TOKEN => {
+        //         // Encountered a sring literal while parsing a token; return the new sring.
+        //         return pattern;
+        //     }
+        //     Item::STATEMENT => {
+        //         // %override or %extend.
+        //         return "".to_string();
+        //     }
+        // }
+
+        // let new_name = self.new_nonterminal("literal_string");
+        // self.grammar.symbol_set.push(new_name.clone());
+        // self.grammar.terminals.push(Terminal::new(
+        //     &new_name,
+        //     &regex::escape(&matched_string["content"]),
+        //     self.cur_priority,
+        // ));
+        // return new_name;
 
         // return matched_string["content"].to_string();
     }
@@ -618,15 +690,30 @@ impl EBNFParser {
             return "".into();
         };
         self.consume(re_match.len());
-        let new_name = self.new_nonterminal("regex");
-        self.grammar.symbol_set.push(new_name.clone());
-        self.grammar.terminals.push(Terminal::new(
-            &new_name,
-            &re_match.as_str(),
-            self.cur_priority,
-        ));
+        // match self.cur_parsing {
+            // Item::RULE => {
+                // Encountered a literal in the process of parsing a rule; make
+                // a new anonymous terminal.
+                let new_name = self.new_nonterminal("__REGEX");
+                self.grammar.symbol_set.push(new_name.clone());
+                self.grammar.terminals.push(Terminal::new(
+                    &new_name,
+                    &re_match.as_str(),
+                    self.cur_priority,
+                ));
 
-        return new_name;
+                return new_name;
+        //     }
+        //     Item::TOKEN => {
+        //         // Encountered a regex while parsing a token; return the regex
+        //         // as is.
+        //         return re_match.as_str().to_string();
+        //     }
+        //     Item::STATEMENT => {
+        //         // Either %override or %extend. TODO: Implement
+        //         return "".to_string();
+        //     }
+        // }
     }
 
     /// Handle a range of repetitions of the annotated item.
@@ -811,7 +898,7 @@ impl EBNFParser {
     /// Make a new, unique nonterminal name.
     fn new_nonterminal(&mut self, annotation: &str) -> String {
         self.nonce += 1;
-        format!("generated_{}_{}", annotation, self.nonce)
+        format!("{}_{}", annotation, self.nonce)
     }
 
     /// Report a parse error with the line and column number. This procedure
@@ -831,17 +918,19 @@ mod tests {
     #[test]
     fn parse_simple_grammar() {
         let parser = EBNFParser::new("s: c c\n c: \"C\" c | \"D\"", "s");
-        let grammar = parser.parse();
+        let Ok((grammar, lexer)) = parser.parse() else {
+            panic!()
+        };
         let expected_grammar = Grammar {
             symbol_set: vec![
-                "c".to_string(),
-                "generated_literal_string_1".to_string(),
-                "generated_literal_string_2".to_string(),
+                "__ANONYMOUS_LITERAL_1".to_string(),
+                "__ANONYMOUS_LITERAL_2".to_string(),
+		"c".to_string(),
                 "s".to_string(),
             ],
             terminals: vec![
-                Terminal::new("generated_literal_string_1", "C", 0),
-                Terminal::new("generated_literal_string_2", "D", 0),
+                Terminal::new("__ANONYMOUS_LITERAL_1", "C", 0),
+                Terminal::new("__ANONYMOUS_LITERAL_2", "D", 0),
             ],
             start_symbol: "s".to_string(),
             productions: vec![
@@ -851,11 +940,11 @@ mod tests {
                 },
                 Production {
                     lhs: "c".to_string(),
-                    rhs: vec!["generated_literal_string_1".to_string(), "c".to_string()],
+                    rhs: vec!["__ANONYMOUS_LITERAL_1".to_string(), "c".to_string()],
                 },
                 Production {
                     lhs: "c".to_string(),
-                    rhs: vec!["generated_literal_string_2".to_string()],
+                    rhs: vec!["__ANONYMOUS_LITERAL_2".to_string()],
                 },
             ],
         };
@@ -869,6 +958,13 @@ mod tests {
     }
 
     #[test]
+    fn ignore_statement() {
+        let parser = EBNFParser::new(r#"%ignore WS"#, "s");
+        let grammar = parser.parse();
+        println!("{:#?}", grammar);
+    }
+
+    #[test]
     fn parse_string() {
         let parser = EBNFParser::new(r#"s: "abc""#, "s");
         let grammar = parser.parse();
@@ -879,9 +975,9 @@ mod tests {
     fn parse_json_grammar() {
         let parser = EBNFParser::new(
             &fs::read_to_string("./grammars/json.lark").unwrap(),
-            "?start",
+            "start",
         );
         let grammar = parser.parse();
-        println!("{:#?}", grammar);
+        println!("{:#?}", grammar.unwrap().0);
     }
 }

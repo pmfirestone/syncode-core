@@ -16,21 +16,29 @@ use crate::types::*;
 
 const AUGMENTED_START_SYMBOL: &str = "supersecretnewstart";
 
-/// A convenience terminal representing the end of the input.
-fn eof() -> Terminal {
-    Terminal::new("$", "", 0)
+// /// A convenience terminal representing the end of the input.
+// fn eof() -> Terminal {
+//     Terminal::new("$", "", 0)
+// }
+
+/// Check whether a given symbol is a terminal in this grammar.
+pub(crate) fn is_terminal(symbol: &String, _grammar: &Grammar) -> bool {
+    // eprintln!("{symbol}");
+    // symbol.to_ascii_uppercase() == *symbol
+    for terminal in &_grammar.terminals {
+	// eprintln!("{terminal}");
+        if *symbol == terminal.name {
+            return true;
+        }
+    }
+    return false;
 }
 
-/// Check whether a given symbol (i.e. String) is a terminal (i.e. initial capitals).
-fn is_terminal(symbol: &String) -> bool {
-    *symbol == symbol.to_ascii_uppercase()
-}
-
-/// Construct the first set of a given symbol.
+/// construct the first set of a given symbol.
 ///
 /// The algorithm comes from sec. 4.4.2 of the Dragon Book 2e, p. 221.
 fn symbol_first(symbol: &String, grammar: &Grammar) -> HashSet<String> {
-    if is_terminal(symbol) {
+    if is_terminal(symbol, grammar) {
         // If symbol is a terminal, then first(symbol) = {symbol}.
         return HashSet::from([symbol.clone()]);
     } else {
@@ -106,7 +114,7 @@ fn closure(items: HashSet<Item>, grammar: &Grammar) -> HashSet<Item> {
     'repeat: loop {
         let old_item_set = item_set.clone();
         for item in item_set.clone() {
-            for production in &grammar.productions[..] {
+            for production in &grammar.productions {
                 if item.dot == item.production.rhs.len() {
                     // We only want productions that don't have the dot at the
                     // end (and to avoid a panic when indexing at the next
@@ -210,9 +218,10 @@ fn action_table(grammar: &Grammar) -> ActionTable {
         for item in &item_set {
             // If [A -> ɑ·aꞵ, b] is in item_set_i...
             if item.dot < item.production.rhs.len() {
-                if is_terminal(&item.production.rhs[item.dot]) {
+                if is_terminal(&item.production.rhs[item.dot], &grammar) {
                     // ...where a is a terminal...
                     let terminal = &item.production.rhs[item.dot];
+                    eprintln!("is_terminal: {terminal}");
                     // and goto(item_set_i, a) = item_set_j...
                     let goto_item_set = goto(&item_set, &terminal.clone(), &grammar);
                     let Ok(goto_state_id) = find_state_id(&goto_item_set, &item_sets) else {
@@ -229,6 +238,7 @@ fn action_table(grammar: &Grammar) -> ActionTable {
                     );
                 } else {
                     // The next symbol is not a terminal, so ignore it.
+                    eprintln!("not a terminal: {}", item.production.rhs[item.dot]);
                 }
             }
             // If [A -> ɑ·, a] is in item_set_i, A != AUGMENTED_START_SYMBOL,
@@ -263,7 +273,7 @@ fn goto_table(grammar: &Grammar) -> GotoTable {
         // The goto transitions for state state_id are constructed for all
         // nonterminals A using the goto function.
         for symbol in &grammar.symbol_set {
-            if !is_terminal(symbol) {
+            if !is_terminal(symbol, grammar) {
                 let goto_item_set = goto(&item_set, &symbol, &grammar);
                 let Ok(goto_state_id) = find_state_id(&goto_item_set, &item_sets) else {
                     // Sometimes there just isn't a goto for a given (item_set, symbol) pair.
@@ -323,8 +333,7 @@ mod tests {
     /// (4.55) from the Dragon Book 2e, section 4.7.2, p. 263.
     fn example_grammar() -> Grammar {
         Grammar {
-            terminals: vec![// "C".into(), "D".into()
-            ],
+            terminals: vec![Terminal::new("C", "C", 0), Terminal::new("D", "D", 0)],
             symbol_set: vec!["s".into(), "c".into(), "C".into(), "D".into()],
             start_symbol: "s".into(),
             productions: vec![
@@ -342,6 +351,36 @@ mod tests {
                 },
             ],
         }
+    }
+
+    #[test]
+    fn test_is_terminal() {
+        let grammar = example_grammar();
+        assert!(is_terminal(&"C".to_string(), &grammar));
+        assert!(is_terminal(&"D".to_string(), &grammar));
+        assert!(!is_terminal(&"c".to_string(), &grammar));
+        assert!(!is_terminal(&"s".to_string(), &grammar));
+    }
+
+    #[test]
+    fn item_set() {
+        let grammar = example_grammar();
+        eprintln!(
+            "{:#?}",
+            Vec::from([closure(
+                HashSet::from([Item {
+                    production: Production {
+                        // Make some guaranteed-unique string here instead of this garbage.
+                        lhs: AUGMENTED_START_SYMBOL.to_string(),
+                        rhs: vec![grammar.start_symbol.clone()],
+                    },
+                    dot: 0,
+                    lookahead: "$".to_string(),
+                }]),
+                &grammar,
+            )])
+        );
+        // eprintln!("{:#?}", items(&grammar));
     }
 
     #[test]

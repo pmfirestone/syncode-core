@@ -33,4 +33,4 @@ NUMBER: FLOAT | INT
 SIGNED_NUMBER: ["+"|"-"] NUMBER
 WS: /[ \t\f\r\n]/+
 
-# %ignore WS
+%ignore WS

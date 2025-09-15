@@ -79,11 +79,7 @@ pub struct Production {
 pub struct Grammar {
     /// The set of symbols that are active in this grammar.
     pub symbol_set: Vec<String>,
-    /// The set of terminals that are in this grammar. Each terminal is itself
-    /// a production of the grammar, because the grammar will be put in with
-    /// regexes on the right-hand side of the definitions, including the
-    /// definitions of terminals, which can be in terms of other terminals or
-    /// regexes.
+    /// The set of terminals that are in this grammar.
     pub terminals: Vec<Terminal>,
     /// The original start symbol, not the augmented one we've added.
     pub start_symbol: String,
@@ -130,7 +126,7 @@ pub type GotoTable = HashMap<(usize, String), usize>;
 /// We do not include the state stack as part of the parser struct, since it is
 /// easier by far to handle this struct as an immutable value and keep the
 /// stack as an argument that is passed in and out for each call.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Parser {
     /// The action table.
     pub action_table: ActionTable,
@@ -141,7 +137,7 @@ pub struct Parser {
 }
 
 /// A lexer.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Lexer {
     /// The terminals this lexer recognizes.
     pub terminals: Vec<Terminal>,

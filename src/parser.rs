@@ -561,11 +561,11 @@ mod tests {
 
     #[test]
     fn parse_simple_grammar() {
-        let grammar = EBNFParser::new("s: c c\nc: \"C\" c | \"D\"", "s").parse();
-        let parser = Parser::new(&grammar);
-        let Ok(lexer) = Lexer::new(grammar.terminals, HashSet::new()) else {
+        let Ok((grammar, lexer)) = EBNFParser::new("s: c c\nc: \"C\" c | \"D\"", "s").parse()
+        else {
             panic!()
         };
+        let parser = Parser::new(&grammar);
         eprintln!("{:#?}", parser.action_table);
         let Ok((tokens, remainder)) = lexer.lex(b"CC") else {
             panic!()
@@ -578,13 +578,20 @@ mod tests {
         use crate::grammar::EBNFParser;
         use std::fs;
 
-        let parser = Parser::new(
-            &EBNFParser::new(
-                &fs::read_to_string("./grammars/json.lark").unwrap(),
-                "?start",
-            )
-            .parse(),
-        );
+        let Ok((grammar, lexer)) = &EBNFParser::new(
+            &fs::read_to_string("./grammars/json.lark").unwrap(),
+            "start",
+        )
+        .parse() else {
+            panic!()
+        };
+
+        eprintln!("Grammar: {:#?}", grammar);
+
+        let parser = Parser::new(&grammar);
+
+        eprintln!("Action table: {:#?}", parser.action_table);
+        eprintln!("Goto table: {:#?}", parser.goto_table);
 
         //       eprintln!(
         //           "{:#?}",
