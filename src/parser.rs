@@ -540,6 +540,7 @@ mod tests {
                 Terminal::new("L_PAREN", r"\(", 0),
                 Terminal::new("R_PAREN", r"\)", 0),
                 Terminal::new("IDENTIFIER", r"[a-zA-Z_]*", 0),
+		Terminal::new("$", "", 0)
             ],
             start_symbol: "start".to_string(),
             productions: vec![Production {

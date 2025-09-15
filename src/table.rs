@@ -333,7 +333,11 @@ mod tests {
     /// (4.55) from the Dragon Book 2e, section 4.7.2, p. 263.
     fn example_grammar() -> Grammar {
         Grammar {
-            terminals: vec![Terminal::new("C", "C", 0), Terminal::new("D", "D", 0)],
+            terminals: vec![
+                Terminal::new("C", "C", 0),
+                Terminal::new("D", "D", 0),
+                Terminal::new("$", "", 0),
+            ],
             symbol_set: vec!["s".into(), "c".into(), "C".into(), "D".into()],
             start_symbol: "s".into(),
             productions: vec![
