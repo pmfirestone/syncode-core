@@ -57,13 +57,12 @@ fn symbol_first(symbol: &String, grammar: &Grammar) -> HashSet<String> {
                 continue;
             }
 
-            for inner_symbol in &production.rhs
-            {
+            for inner_symbol in &production.rhs {
                 // Place the contents of the first set of the resulting
                 // symbol into this symbol's first set...
-		if inner_symbol == symbol {
-		    continue;
-		}
+                if inner_symbol == symbol {
+                    continue;
+                }
                 let first = symbol_first(inner_symbol, grammar);
                 first_of_this_production.extend(first.clone().into_iter());
                 first_of_this_production.remove(""); // We don't want to add ϵ prematurely.
@@ -498,7 +497,7 @@ mod tests {
     fn ignore_terminals() {
         use crate::grammar::EBNFParser;
         let Ok(grammar) = EBNFParser::new(
-	    &fs::read_to_string("./grammars/tiny.lark").unwrap(),
+            &fs::read_to_string("./grammars/tiny.lark").unwrap(),
             "start",
         )
         .parse() else {
@@ -506,6 +505,9 @@ mod tests {
         };
 
         eprintln!("{:#?}", grammar);
-        eprintln!("first(ch) = {:#?}", symbol_first(&"ch".to_string(), &grammar));
+        eprintln!(
+            "first(ch) = {:#?}",
+            symbol_first(&"ch".to_string(), &grammar)
+        );
     }
 }
