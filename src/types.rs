@@ -45,7 +45,7 @@ pub struct Terminal {
     /// The regex describing this terminal.
     pub pattern: String,
     /// The DFA that matches this terminal.
-    pub dfa: Box<dense::DFA<Vec<u32>>>,
+    pub dfa: Rc<dense::DFA<Vec<u32>>>,
     /// This terminal's priority in lexing.
     pub priority: i32,
 }
