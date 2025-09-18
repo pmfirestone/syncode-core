@@ -152,13 +152,13 @@ pub fn dfa_mask_store(
     let mut store: DFAMaskStore = HashMap::new();
     for (terminal, state_id) in &all_states {
         // For now, hard-code the lookahead of two terminals.
-        let next_terminals = parser.next_terminals(&terminal.name);
-        for next_terminal in &next_terminals {
-            let after_next_terminals = parser.next_terminals(next_terminal);
-            for after_next_terminal in &after_next_terminals {
+        // let next_terminals = parser.next_terminals(&terminal.name);
+        for next_terminal in lexical_terminals {
+            // let after_next_terminals = parser.next_terminals(next_terminal);
+            for after_next_terminal in lexical_terminals {
                 let accept_sequence = vec![
-                    lexer.get_terminal(next_terminal).unwrap(),
-                    lexer.get_terminal(after_next_terminal).unwrap(),
+                    lexer.get_terminal(&next_terminal.name).unwrap(),
+                    lexer.get_terminal(&after_next_terminal.name).unwrap(),
                 ];
                 let dfa = &terminal.dfa;
                 store.insert(
@@ -370,6 +370,7 @@ mod tests {
             Terminal::new("L_PAREN", r"\(", 0),
             Terminal::new("R_PAREN", r"\)", 0),
             Terminal::new("IDENTIFIER", r"[a-zA-Z_]*", 0),
+            Terminal::new("$", "", 0),
         ];
         let candidate_string = b"is";
         let terminal = Terminal::new("IDENTIFIER", r"[a-zA-Z_]*", 0);
@@ -378,6 +379,7 @@ mod tests {
                 "L_PAREN".to_string(),
                 "R_PAREN".to_string(),
                 "IDENTIFIER".to_string(),
+                "$".to_string(),
             ],
             terminals: lexical_terminals.clone(),
             start_symbol: "start".to_string(),
@@ -392,11 +394,13 @@ mod tests {
             }],
         };
         let parser = Parser::new(&grammar);
+        // println!("{:#?}", parser);
         let Ok(lexer) = Lexer::new(grammar.terminals) else {
             panic!()
         };
         let store = dfa_mask_store(&lexical_terminals, model_vocabulary, &parser, &lexer, 2);
         let starting_state = terminal.advance(terminal.start_state(), candidate_string);
+        // println!("{:#?}", store);
         assert_eq!(
             store
                 .get(&(

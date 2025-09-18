@@ -171,9 +171,9 @@ like_expr: expression_math "LIKE"i expression_math
 not_like_expr: expression_math "NOT"i "LIKE"i expression_math
 
 // `IN` and `NOT IN`
-in_expr: expression_math "IN"i "(" [expression_math ","]* expression_math ")"
+in_expr: expression_math "IN"i "(" (expression_math ",")* expression_math ")"
 subquery_in: expression_math "IN"i subquery
-not_in_expr: expression_math "NOT"i "IN"i "(" [expression_math ","]* expression_math ")"
+not_in_expr: expression_math "NOT"i "IN"i "(" (expression_math ",")* expression_math ")"
 subquery_not_in: expression_math "NOT"i "IN"i subquery
 
 ?literal: boolean -> bool

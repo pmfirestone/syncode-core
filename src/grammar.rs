@@ -798,9 +798,20 @@ impl EBNFParser {
             let (ignore_nonterminal, mut ignore_productions) = self.make_ignore_nonterminal();
             let mut new_productions: Vec<Production> = vec![];
 
+            let descending_terminals: Vec<String> = self
+                .ignore_terminals
+                .clone()
+                .into_iter()
+                .map(|t| self.descendents(&t))
+                .collect::<Vec<_>>()
+                .into_iter()
+                .flatten()
+                .collect();
+
             for production in &self.grammar.productions {
                 if production.rhs == vec!["".to_string()]
                     || self.ignore_terminals.contains(&production.lhs)
+                    || descending_terminals.contains(&production.lhs)
                 {
                     // Don't change productions that are already null.
                     // Don't change productions that define this (non)terminal.
@@ -816,6 +827,35 @@ impl EBNFParser {
 
             self.grammar.productions = new_productions;
         }
+    }
+
+    /// The symbols that "descend" from this one. A symbol descends
+    /// from a symbol if it is on the right hand side of
+    /// this symbol's production or a symbol that descends from it.
+    fn descendents(&self, symbol: &String) -> Vec<String> {
+        let mut descendents = vec![symbol.clone()];
+
+        loop {
+            // As long as there are new descendents to add.
+            let old_descendents = descendents.clone();
+            for symbol in &old_descendents {
+                // Look for each production that begins with each current descendent.
+                for production in &self.grammar.productions {
+                    if production.lhs == **symbol {
+                        for inner_symbol in &production.rhs {
+                            if !descendents.contains(&inner_symbol) {
+                                // Add the new descendents we haven't seen yet.
+                                descendents.push(inner_symbol.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            if descendents == old_descendents {
+                break;
+            }
+        }
+        descendents
     }
 
     /// Make the new nonterminal of the terminals to ignore.

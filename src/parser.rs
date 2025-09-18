@@ -36,10 +36,16 @@ impl Parser {
         let mut terminals_that_could_follow_this_one: Vec<String> = Vec::new();
         for state in states_that_accept_this_terminal {
             // Suppose we've accepted this terminal.
-            let Ok(next_state) = self.next(terminal, vec![state]) else {
-                panic!("Bloody Nora, you've made a real dog's breakfast out of this one.")
+            match self.next(terminal, vec![state]) {
+                Ok(next_state) => {
+                    terminals_that_could_follow_this_one.extend(self.follow(&next_state))
+                }
+                Err(err) => {
+                    panic!(
+                        "State {state} doesn't accept terminal {terminal} even though it should.\nFrom the parser: {err}."
+                    )
+                }
             };
-            terminals_that_could_follow_this_one.extend(self.follow(&next_state))
         }
         terminals_that_could_follow_this_one
     }

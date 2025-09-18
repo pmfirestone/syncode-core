@@ -29,6 +29,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // println!("{:#?}", byte_tokens[32]);
     let mask_store = dfa_mask_store(&grammar.terminals, byte_tokens, &parser, &lexer, 2);
-    println!("{:#?}", mask_store);
+    // println!("{:#?}", mask_store);
     Ok(())
 }
