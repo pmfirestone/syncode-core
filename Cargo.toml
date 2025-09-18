@@ -17,6 +17,7 @@ candle-transformers = "0.9.1"
 tokenizers = { version = "0.21.0", features = ["http"] }
 hf-hub = "0.4.2"
 rayon = "1.11.0"
+fancy-regex = "0.16.1"
 
 [profile.profiling]
 inherits = "release"
