@@ -23,9 +23,6 @@ TODO:
 - Implement directives.
 !*/
 
-use std::collections::HashSet;
-
-use crate::table::is_terminal;
 use crate::types::*;
 use regex::Regex;
 use regex_automata::util::lazy::Lazy;
@@ -87,7 +84,7 @@ const STRING: &str = r#"^\"(?<content>.*?(\\)*?)\"(?<caseinvariant>i?)"#;
 const STRING_RE: Lazy<Regex> = Lazy::new(|| Regex::new(STRING).unwrap());
 const NL: &str = r"^(\r?\n)+\s*";
 const NL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NL).unwrap());
-const REGEXP: &str = r#"^\/(\\\/|\\\\|[^\/])*?\/[imslux]*"#;
+const REGEXP: &str = r#"^\/(?<pattern>(\\\/|\\\\|[^\/])*?)\/(?<flags>[imslux]*)"#;
 const REGEXP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(REGEXP).unwrap());
 const OP: &str = r"^[+\*\?]";
 const OP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(OP).unwrap());
@@ -157,18 +154,8 @@ impl EBNFParser {
         self.grammar.symbol_set.sort();
         self.grammar.symbol_set.dedup();
 
-        // Make ignore terminals ignored, if any.
-        if !self.ignore_terminals.is_empty() {
-            let ignore_nonterminal = self.make_ignore_nonterminal();
-            let mut new_productions: Vec<Production> = vec![];
-
-            for production in &self.grammar.productions {
-                new_productions
-                    .push(self.insert_nonterminal(production.clone(), ignore_nonterminal.clone()))
-            }
-
-            self.grammar.productions = new_productions;
-        }
+        // Make ignore terminals ignored, if any. This is a non-trivial task.
+        self.handle_ignore_terminals();
 
         // Include the special EOF symbol.
         self.grammar.symbol_set.push("$".into());
@@ -440,6 +427,7 @@ impl EBNFParser {
             // operator, which makes sure we don't treat the question mark at
             // the beginning of an identifier as a question mark
             // operator. Instead, we manually implement something like this lookahead.
+            // TOOD: Switch to fancy-regex to support lookaround.
             // eprintln!("Match on OP_RE");
             let new_nonterm = self.new_nonterminal("expression");
             match self.peek(0).unwrap() {
@@ -658,17 +646,17 @@ impl EBNFParser {
     /// grammar and treat them as such.
     fn parse_regex(&mut self) -> String {
         let input_string = self.input_string.clone();
-        let Some(re_match) = REGEXP_RE.find(&input_string[self.cur_pos..]) else {
+        let Some(re_match) = REGEXP_RE.captures(&input_string[self.cur_pos..]) else {
             self.report_parse_error("Failed to parse regular expression.");
             return "".into();
         };
-        self.consume(re_match.len());
+        self.consume(re_match[0].len());
         // Make a new anonymous terminal.
         let new_name = self.new_nonterminal("__REGEX");
         self.grammar.symbol_set.push(new_name.clone());
         self.grammar.terminals.push(Terminal::new(
             &new_name,
-            &re_match.as_str(),
+            &re_match["pattern"],
             self.cur_priority,
         ));
 
@@ -795,25 +783,64 @@ impl EBNFParser {
     /// but that is probably the most common use case.
     fn expand_extends(&mut self) {}
 
+    /// Insert the ignore terminals into each production.
+    ///
+    /// We do this instead of passing the ignore terminals on to the lexer so
+    /// that there aren't multiple kinds of terminals (lexer and parser) that
+    /// we have to juggle when building a mask: the ignore information is
+    /// already integrated directly into the grammar itself; the %ignore
+    /// notation is just syntactic sugar for putting the named terminal at the
+    /// beginning of each production and after each symbol in each production,
+    /// except for productions that are already empty (to prevent infinite
+    /// regression).
+    fn handle_ignore_terminals(&mut self) {
+        if !self.ignore_terminals.is_empty() {
+            let (ignore_nonterminal, mut ignore_productions) = self.make_ignore_nonterminal();
+            let mut new_productions: Vec<Production> = vec![];
+
+            for production in &self.grammar.productions {
+                if production.rhs == vec!["".to_string()]
+                    || self.ignore_terminals.contains(&production.lhs)
+                {
+                    // Don't change productions that are already null.
+                    // Don't change productions that define this (non)terminal.
+                    new_productions.push(production.clone());
+                } else {
+                    new_productions.push(
+                        self.insert_nonterminal(production.clone(), ignore_nonterminal.clone()),
+                    )
+                }
+            }
+
+            new_productions.append(&mut ignore_productions);
+
+            self.grammar.productions = new_productions;
+        }
+    }
+
     /// Make the new nonterminal of the terminals to ignore.
+    ///
+    /// Return the name of the new nonterminal and the list of productions that
+    /// result once we desugar the definition.
     ///
     /// This new nonterminal is defined as:
     /// ```
     /// new_nonterm: (ignore_terminal1 | ... | ignore_terminaln)*
     /// ```
-    fn make_ignore_nonterminal(&mut self) -> String {
+    fn make_ignore_nonterminal(&mut self) -> (String, Vec<Production>) {
         let new_nonterminal = self.new_nonterminal("__IGNORE");
+        let mut new_productions: Vec<Production> = vec![];
         for ignore in &self.ignore_terminals {
-            self.grammar.productions.push(Production {
+            new_productions.push(Production {
                 lhs: new_nonterminal.clone(),
-                rhs: vec![new_nonterminal.clone(), ignore.clone()],
+                rhs: vec![ignore.clone(), new_nonterminal.clone()],
             });
         }
-        self.grammar.productions.push(Production {
+        new_productions.push(Production {
             lhs: new_nonterminal.clone(),
             rhs: vec!["".to_string()],
         });
-        new_nonterminal
+        (new_nonterminal, new_productions)
     }
 
     /// Insert a non-terminal between each nonterminal on the right-hand side of a production.
@@ -945,27 +972,8 @@ mod tests {
                 },
             ],
         };
+
         assert_eq!(grammar, expected_grammar);
-    }
-
-    #[test]
-    fn string_regex() {
-        assert!(STRING_RE.is_match("\"true\""));
-        eprintln!("{:#?}", STRING_RE.captures("\"true\""));
-    }
-
-    #[test]
-    fn ignore_statement() {
-        let parser = EBNFParser::new(r#"%ignore WS"#, "s");
-        let grammar = parser.parse();
-        println!("{:#?}", grammar);
-    }
-
-    #[test]
-    fn parse_string() {
-        let parser = EBNFParser::new(r#"s: "abc""#, "s");
-        let grammar = parser.parse();
-        println!("{:#?}", grammar);
     }
 
     #[test]

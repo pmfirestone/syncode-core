@@ -141,8 +141,6 @@ pub struct Parser {
 pub struct Lexer {
     /// The terminals this lexer recognizes.
     pub terminals: Vec<Terminal>,
-    /// The terminals that this lexer ignores.
-    pub ignore_types: HashSet<Terminal>,
     /// The terminals that contain newlines.
     pub newline_types: HashSet<Terminal>,
     /// The DFA for matching patterns.

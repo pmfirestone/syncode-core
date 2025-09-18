@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::types::*;
 
-const AUGMENTED_START_SYMBOL: &str = "supersecretnewstart";
+pub const AUGMENTED_START_SYMBOL: &str = "supersecretnewstart";
 
 // /// A convenience terminal representing the end of the input.
 // fn eof() -> Terminal {
@@ -33,34 +33,56 @@ pub(crate) fn is_terminal(symbol: &String, _grammar: &Grammar) -> bool {
     return false;
 }
 
-/// construct the first set of a given symbol.
+/// Construct the first set of a given symbol.
 ///
-/// The algorithm comes from sec. 4.4.2 of the Dragon Book 2e, p. 221.
+/// The algorithm comes from sec. 4.4.2 of the Dragon Book 2e, p. 221, with
+/// some modifications to behave well for left-recursive grammars.
 fn symbol_first(symbol: &String, grammar: &Grammar) -> HashSet<String> {
     if is_terminal(symbol, grammar) {
         // eprintln!("terminal: {symbol}");
         // If symbol is a terminal, then first(symbol) = {symbol}.
         return HashSet::from([symbol.clone()]);
     } else {
+        // eprintln!("nonterminal: {symbol}");
         // If symbol is a nonterminal...
         let mut first_set = HashSet::new();
-        for production in grammar.productions.clone() {
-            // And symbol -> y1y2...yk for some k >= 1,
-            if production.lhs == *symbol {
-                for symbol in &production.rhs {
-                    // Place the contents of the first set of the resulting
-                    // symbol into this symbol's first set...
-                    let first = symbol_first(symbol, grammar);
-                    first_set.extend(first.clone().into_iter());
-                    if production.rhs == Vec::<String>::new() {
-                        // If symbol -> ϵ is a production, add ϵ to first(symbol).
-                        first_set.insert("".to_string());
-                    }
-                    if !first.contains("") {
-                        // Keep adding as long as the first sets contain ϵ.
-                        return first_set;
-                    }
+        for production in grammar.productions.iter().filter(|p| p.lhs == *symbol) {
+            // For each of the productions whose left hand side is symbol.
+            let mut empty_flag = true;
+            let mut first_of_this_production = HashSet::new();
+
+            if production.rhs == vec!["".to_string()] {
+                // If symbol -> ϵ is a production, add ϵ to first(symbol)
+                first_set.insert("".to_string());
+                continue;
+            }
+
+            for inner_symbol in &production.rhs
+            {
+                // Place the contents of the first set of the resulting
+                // symbol into this symbol's first set...
+		if inner_symbol == symbol {
+		    continue;
+		}
+                let first = symbol_first(inner_symbol, grammar);
+                first_of_this_production.extend(first.clone().into_iter());
+                first_of_this_production.remove(""); // We don't want to add ϵ prematurely.
+
+                if first.contains("") {
+                    // If ϵ is in symbol's first set, continue adding from the
+                    // next symbol in the production.
+                    continue;
+                } else {
+                    empty_flag = false;
+                    break;
                 }
+            }
+
+            first_set.extend(first_of_this_production.into_iter());
+
+            if empty_flag {
+                // ϵ was in each symbol's first set.
+                first_set.insert("".to_string());
             }
         }
         first_set
@@ -110,7 +132,7 @@ fn string_first(string: Vec<String>, grammar: &Grammar) -> HashSet<String> {
 /// Compute the closure of items.
 ///
 /// This algorithm is from sec. 4.7.2 of the Dragon Book 2e, p. 261.
-fn closure(items: HashSet<Item>, grammar: &Grammar) -> HashSet<Item> {
+pub fn closure(items: HashSet<Item>, grammar: &Grammar) -> HashSet<Item> {
     let mut item_set: HashSet<Item> = items;
     'repeat: loop {
         let old_item_set = item_set.clone();
@@ -317,12 +339,24 @@ fn checked_insert(state_id: usize, terminal: String, action: Action, table: &mut
         // If any conflicting actions result from the above rules, the
         // algorithm fails to produce a parser because the grammar is not
         // LR(1). FIXME: Do this error checking more cleanly.
-        panic!(
-            "While inserting an action into the action table, discovered a conflicting action:\nstate_id: {state_id}, terminal: {:#?}, existing action: {:#?}, new action: {:#?}",
-            terminal.clone(),
-            table.get(&(state_id, terminal)),
-            action
-        );
+
+        // As a special case, if the action we were going to insert is the same
+        // as the one that's already there, we give a warning and continue.
+        if table.get(&(state_id, terminal.clone())) == Some(&action) {
+            eprintln!(
+                "WARNING: While inserting an action into the action table, we found the same action we were going to insert.\nstate_id: {state_id}, terminal: {:#?}, existing action: {:#?}, new action: {:#?}",
+                terminal.clone(),
+                table.get(&(state_id, terminal.clone())),
+                action
+            );
+        } else {
+            panic!(
+                "While inserting an action into the action table, discovered a conflicting action:\nstate_id: {state_id}, terminal: {:#?}, existing action: {:#?}, new action: {:#?}",
+                terminal.clone(),
+                table.get(&(state_id, terminal)),
+                action
+            );
+        }
     }
     // then action_table[i, a] = shift(j).
     table.insert((state_id, terminal.clone()), action);
@@ -330,6 +364,8 @@ fn checked_insert(state_id: usize, terminal: String, action: Action, table: &mut
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
     use Action::*;
 
@@ -381,14 +417,21 @@ mod tests {
                 }),
             ),
             (
+                (4, "D".into()),
+                Reduce(Production {
+                    lhs: "c".into(),
+                    rhs: vec!["D".into()],
+                }),
+            ),
+            (
                 (5, "$".into()),
                 Reduce(Production {
                     lhs: "s".into(),
                     rhs: vec!["c".into(), "c".into()],
                 }),
             ),
-            ((6, "D".into()), Shift(7)),
             ((6, "C".into()), Shift(6)),
+            ((6, "D".into()), Shift(7)),
             (
                 (7, "$".into()),
                 Reduce(Production {
@@ -398,6 +441,13 @@ mod tests {
             ),
             (
                 (8, "C".into()),
+                Reduce(Production {
+                    lhs: "c".into(),
+                    rhs: vec!["C".into(), "c".into()],
+                }),
+            ),
+            (
+                (8, "D".into()),
                 Reduce(Production {
                     lhs: "c".into(),
                     rhs: vec!["C".into(), "c".into()],
@@ -419,7 +469,43 @@ mod tests {
             ((3, "c".into()), 8),
             ((6, "c".into()), 9),
         ]);
+        // eprintln!("{:#?}", action_table);
         assert_eq!(action_table, expected_action_table);
         assert_eq!(goto_table, expected_goto_table);
+    }
+
+    #[test]
+    fn json() {
+        use crate::grammar::EBNFParser;
+        use std::fs;
+        let Ok(grammar) = EBNFParser::new(
+            &fs::read_to_string("./grammars/json.lark").unwrap(),
+            "start",
+        )
+        .parse() else {
+            panic!()
+        };
+
+        println!("{:#?}", grammar);
+
+        // let json_action_table = action_table(&grammar);
+        // let json_goto_table = goto_table(&grammar);
+
+        let parser = Parser::new(&grammar);
+    }
+
+    #[test]
+    fn ignore_terminals() {
+        use crate::grammar::EBNFParser;
+        let Ok(grammar) = EBNFParser::new(
+	    &fs::read_to_string("./grammars/tiny.lark").unwrap(),
+            "start",
+        )
+        .parse() else {
+            panic!()
+        };
+
+        eprintln!("{:#?}", grammar);
+        eprintln!("first(ch) = {:#?}", symbol_first(&"ch".to_string(), &grammar));
     }
 }

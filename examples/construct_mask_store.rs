@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
 
     let parser = Parser::new(&grammar.clone());
-    let Ok(lexer) = Lexer::new(grammar.terminals.clone(), HashSet::new()) else {
+    let Ok(lexer) = Lexer::new(grammar.terminals.clone()) else {
         panic!()
     };
 

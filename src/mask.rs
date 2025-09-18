@@ -392,7 +392,7 @@ mod tests {
             }],
         };
         let parser = Parser::new(&grammar);
-        let Ok(lexer) = Lexer::new(grammar.terminals, HashSet::new()) else {
+        let Ok(lexer) = Lexer::new(grammar.terminals) else {
             panic!()
         };
         let store = dfa_mask_store(&lexical_terminals, model_vocabulary, &parser, &lexer, 2);
