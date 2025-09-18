@@ -24,7 +24,7 @@ TODO:
 !*/
 
 use crate::types::*;
-use regex::Regex;
+use fancy_regex::Regex;
 use regex_automata::util::lazy::Lazy;
 
 #[derive(PartialEq)]
@@ -84,9 +84,9 @@ const STRING: &str = r#"^\"(?<content>.*?(\\)*?)\"(?<caseinvariant>i?)"#;
 const STRING_RE: Lazy<Regex> = Lazy::new(|| Regex::new(STRING).unwrap());
 const NL: &str = r"^(\r?\n)+\s*";
 const NL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NL).unwrap());
-const REGEXP: &str = r#"^\/(?<pattern>(\\\/|\\\\|[^\/])*?)\/(?<flags>[imslux]*)"#;
+const REGEXP: &str = r#"^\/(?!\/)(?<pattern>(\\\/|\\\\|[^\/])*?)\/(?<flags>[imslux]*)"#;
 const REGEXP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(REGEXP).unwrap());
-const OP: &str = r"^[+\*\?]";
+const OP: &str = r"^[+\*]|[?](?![a-z])";
 const OP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(OP).unwrap());
 const VBAR: &str = r"^((\r?\n)+\s*)?\|";
 const VBAR_RE: Lazy<Regex> = Lazy::new(|| Regex::new(VBAR).unwrap());
@@ -138,9 +138,15 @@ impl EBNFParser {
             // Advance to next non-whitespace (or comment) in the input.
             self.consume_space();
             // item: rule | token
-            if RULE_RE.is_match(&self.input_string[self.cur_pos..]) {
+            if RULE_RE
+                .is_match(&self.input_string[self.cur_pos..])
+                .unwrap()
+            {
                 self.parse_rule();
-            } else if TOKEN_RE.is_match(&self.input_string[self.cur_pos..]) {
+            } else if TOKEN_RE
+                .is_match(&self.input_string[self.cur_pos..])
+                .unwrap()
+            {
                 self.parse_token();
             } else if self.peek(0) == Some('%') {
                 self.parse_statement();
@@ -174,8 +180,10 @@ impl EBNFParser {
         // We know there's a match because this method is only called after
         // we've already determined that the next thing is a rule.
         // Remove the leading ? or !, if any, because we don't care about it.
+	self.consume_space();
         let rule_match = RULE_RE
             .captures(&self.input_string[self.cur_pos..])
+            .unwrap()
             .unwrap();
         // eprintln!("{:?}", rule_match);
         self.cur_parsing = Item::RULE;
@@ -210,10 +218,14 @@ impl EBNFParser {
     /// Note that the params that are present in the syntax have already been
     /// expanded by the time this procedure is called.
     fn parse_token(&mut self) {
-        let token_match = TOKEN_RE.find(&self.input_string[self.cur_pos..]).unwrap();
+	self.consume_space();
+        let token_match = TOKEN_RE
+            .find(&self.input_string[self.cur_pos..])
+            .unwrap()
+            .unwrap();
 
         self.name_stack.push(token_match.as_str().into());
-        self.consume(token_match.len());
+        self.consume(token_match.as_str().len());
 
         if self.peek(0) == Some('.') {
             self.parse_priority();
@@ -283,7 +295,7 @@ impl EBNFParser {
             "%ig" => {
                 self.consume("%ignore".len());
                 self.consume_space();
-                let Some(token) = TOKEN_RE.find(&self.input_string[self.cur_pos..]) else {
+                let Ok(Some(token)) = TOKEN_RE.find(&self.input_string[self.cur_pos..]) else {
                     self.report_parse_error("Expected token after %ignore statement.");
                     return;
                 };
@@ -312,7 +324,7 @@ impl EBNFParser {
             self.report_parse_error("Expected '.'.");
         }
 
-        let Some(number_match) = NUMBER_RE.find(&self.input_string[self.cur_pos..]) else {
+        let Ok(Some(number_match)) = NUMBER_RE.find(&self.input_string[self.cur_pos..]) else {
             // Add a return statement to make the compiler happy, even though
             // this call never returns.
             self.report_parse_error("Expected a number.");
@@ -322,7 +334,7 @@ impl EBNFParser {
         // Parsing as an integer *should* never fail, since we've just matched
         // something that must be a valid number.
         self.cur_priority = number_match.as_str().parse::<i32>().unwrap();
-        self.consume(number_match.len());
+        self.consume(number_match.as_str().len());
     }
 
     /// Parse the expansions of the rule.
@@ -348,15 +360,18 @@ impl EBNFParser {
 
             // If there's another alias, parse it.
             // self.consume_space();
-            if VBAR_RE.is_match(&self.input_string[self.cur_pos..]) {
-                // eprintln!("VBAR match");
-                // Advance past the VBAR to the beginning of the next alias.
-                self.consume_space();
-                self.consume(1);
-                continue;
-            } else {
-                // eprintln!("VBAR no match");
-                break self.name_stack.last().unwrap().to_string();
+            match VBAR_RE.is_match(&self.input_string[self.cur_pos..]) {
+                Ok(true) => {
+                    // eprintln!("VBAR match");
+                    // Advance past the VBAR to the beginning of the next alias.
+                    self.consume_space();
+                    self.consume(1);
+                    continue;
+                }
+                _ => {
+                    // eprintln!("VBAR no match");
+                    break self.name_stack.last().unwrap().to_string();
+                }
             }
         }
     }
@@ -391,7 +406,9 @@ impl EBNFParser {
             self.consume_space();
             res.push(self.parse_expression());
             self.consume_space();
-            if VBAR_RE.is_match(&self.input_string[self.cur_pos..])
+            if VBAR_RE
+                .is_match(&self.input_string[self.cur_pos..])
+                .unwrap()
                 || self.peek(0) == Some(')')
                 || self.peek(0) == Some(']')
                 || (self.peek(0) == Some('-') && self.peek(1) == Some('>'))
@@ -415,73 +432,70 @@ impl EBNFParser {
         let new_atom = self.parse_atom();
         // eprintln!("parse_expression: {}", new_atom);
         // eprintln!("cur_pos: {}", self.cur_pos);
-        if OP_RE.is_match(&self.input_string[self.cur_pos..])
-            && !(self.peek(0) == Some('?')
-		 // Use a default value that will evaluate to false to avoid
-		 // panicking in the case where the question mark is the last
-		 // character of the input.
-		 && self.peek(1).unwrap_or('!').is_ascii_lowercase())
-        {
-            // We don't get lookahead in this regex library, but the lark
-            // grammar has the lookahead (?![a-z]) after the question mark
-            // operator, which makes sure we don't treat the question mark at
-            // the beginning of an identifier as a question mark
-            // operator. Instead, we manually implement something like this lookahead.
-            // TOOD: Switch to fancy-regex to support lookaround.
-            // eprintln!("Match on OP_RE");
-            let new_nonterm = self.new_nonterminal("expression");
-            match self.peek(0).unwrap() {
-                '*' => {
-                    // Convert every repetition E* to a fresh non-terminal X
-                    // and add X = $\epsilon$ | X E.
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec!["".to_string()],
-                    });
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec![new_nonterm.clone(), new_atom],
-                    });
+        match OP_RE.is_match(&self.input_string[self.cur_pos..]) {
+            Ok(true) => {
+                // We don't get lookahead in this regex library, but the lark
+                // grammar has the lookahead (?![a-z]) after the question mark
+                // operator, which makes sure we don't treat the question mark at
+                // the beginning of an identifier as a question mark
+                // operator. Instead, we manually implement something like this lookahead.
+                // TOOD: Switch to fancy-regex to support lookaround.
+                // eprintln!("Match on OP_RE");
+                let new_nonterm = self.new_nonterminal("expression");
+                match self.peek(0).unwrap() {
+                    '*' => {
+                        // Convert every repetition E* to a fresh non-terminal X
+                        // and add X = $\epsilon$ | X E.
+                        self.grammar.productions.push(Production {
+                            lhs: new_nonterm.clone(),
+                            rhs: vec!["".to_string()],
+                        });
+                        self.grammar.productions.push(Production {
+                            lhs: new_nonterm.clone(),
+                            rhs: vec![new_nonterm.clone(), new_atom],
+                        });
+                    }
+                    '+' => {
+                        // Convert every at-least-one repetition E+ to a fresh
+                        // non-terminal X and add X = E | X E.
+                        self.grammar.productions.push(Production {
+                            lhs: new_nonterm.clone(),
+                            rhs: vec![new_atom.clone()],
+                        });
+                        self.grammar.productions.push(Production {
+                            lhs: new_nonterm.clone(),
+                            rhs: vec![new_nonterm.clone(), new_atom.clone()],
+                        });
+                    }
+                    '?' => {
+                        // Convert every option E? to a fresh non-terminal X and
+                        // add X = $\epsilon$ | E.
+                        self.grammar.productions.push(Production {
+                            lhs: new_nonterm.clone(),
+                            rhs: vec!["".to_string()],
+                        });
+                        self.grammar.productions.push(Production {
+                            lhs: new_nonterm.clone(),
+                            rhs: vec![new_atom.clone()],
+                        });
+                    }
+                    _ => { /* We should never reach this because we already matched above. */ }
                 }
-                '+' => {
-                    // Convert every at-least-one repetition E+ to a fresh
-                    // non-terminal X and add X = E | X E.
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec![new_atom.clone()],
-                    });
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec![new_nonterm.clone(), new_atom.clone()],
-                    });
-                }
-                '?' => {
-                    // Convert every option E? to a fresh non-terminal X and
-                    // add X = $\epsilon$ | E.
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec!["".to_string()],
-                    });
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec![new_atom.clone()],
-                    });
-                }
-                _ => { /* We should never reach this because we already matched above. */ }
+                self.consume(1);
+                self.grammar.symbol_set.push(new_nonterm.clone());
+                return new_nonterm;
+                // TODO: Add support for range repeats.
+                // } else if self.peek(0) == Some('~') {
+                //     // The following is a range of some kind.
+                //     self.consume(1);
+                //     self.consume_space();
+                //     // self.handle_range();
             }
-            self.consume(1);
-            self.grammar.symbol_set.push(new_nonterm.clone());
-            return new_nonterm;
-            // TODO: Add support for range repeats.
-            // } else if self.peek(0) == Some('~') {
-            //     // The following is a range of some kind.
-            //     self.consume(1);
-            //     self.consume_space();
-            //     // self.handle_range();
-        } else {
-            // eprintln!("No match on OP_RE");
-            // An unquantified atom.
-            new_atom
+            _ => {
+                // eprintln!("No match on OP_RE");
+                // An unquantified atom.
+                new_atom
+            }
         }
     }
 
@@ -553,7 +567,7 @@ impl EBNFParser {
         let input_string = self.input_string.clone();
         // self.consume_space();
 
-        let Some(matched_string) = STRING_RE.captures(&input_string[self.cur_pos..]) else {
+        let Ok(Some(matched_string)) = STRING_RE.captures(&input_string[self.cur_pos..]) else {
             return self.report_parse_error("String ill-formed.");
         };
 
@@ -568,7 +582,7 @@ impl EBNFParser {
         if self.peek(0) == Some('.') && self.peek(1) == Some('.') {
             // Literal range!
             self.consume(2);
-            let Some(second_matched_string) = STRING_RE.captures(&input_string[self.cur_pos..])
+            let Ok(Some(second_matched_string)) = STRING_RE.captures(&input_string[self.cur_pos..])
             else {
                 return self.report_parse_error("String ill-formed.");
             };
@@ -614,16 +628,27 @@ impl EBNFParser {
     /// `name: RULE | TOKEN`
     fn parse_name(&mut self) -> String {
         let input_string = self.input_string.clone();
-        if RULE_RE.is_match(&self.input_string[self.cur_pos..]) {
-            let rule_match = RULE_RE.find(&input_string[self.cur_pos..]).unwrap();
-            self.consume(rule_match.len());
+	self.consume_space();
+        if RULE_RE
+            .is_match(&self.input_string[self.cur_pos..])
+            .unwrap()
+        {
+            let Some(rule_match) = RULE_RE.find(&input_string[self.cur_pos..]).unwrap() else {
+                panic!()
+            };
+            self.consume(rule_match.as_str().len());
             self.grammar
                 .symbol_set
                 .push(rule_match.as_str().to_string());
             return rule_match.as_str().into();
-        } else if TOKEN_RE.is_match(&self.input_string[self.cur_pos..]) {
-            let token_match = TOKEN_RE.find(&input_string[self.cur_pos..]).unwrap();
-            self.consume(token_match.len());
+        } else if TOKEN_RE
+            .is_match(&self.input_string[self.cur_pos..])
+            .unwrap()
+        {
+            let Some(token_match) = TOKEN_RE.find(&input_string[self.cur_pos..]).unwrap() else {
+                panic!()
+            };
+            self.consume(token_match.as_str().len());
             self.grammar
                 .symbol_set
                 .push(token_match.as_str().to_string());
@@ -646,7 +671,7 @@ impl EBNFParser {
     /// grammar and treat them as such.
     fn parse_regex(&mut self) -> String {
         let input_string = self.input_string.clone();
-        let Some(re_match) = REGEXP_RE.captures(&input_string[self.cur_pos..]) else {
+        let Ok(Some(re_match)) = REGEXP_RE.captures(&input_string[self.cur_pos..]) else {
             self.report_parse_error("Failed to parse regular expression.");
             return "".into();
         };
