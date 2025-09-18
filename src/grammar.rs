@@ -41,7 +41,7 @@ enum Item {
 ///
 /// Only one of these structs will exist throughout the life of the program,
 /// and it will be mutated a lot.
-pub(crate) struct EBNFParser {
+pub struct EBNFParser {
     /// The current position in the input.
     cur_pos: usize,
     /// The ebnf grammar that we are currently parsing.
@@ -101,7 +101,7 @@ const TOKEN: &str = r"^_?[A-Z][_A-Z0-9]*";
 const TOKEN_RE: Lazy<Regex> = Lazy::new(|| Regex::new(TOKEN).unwrap());
 
 impl EBNFParser {
-    pub(crate) fn new(input_string: &str, starting_rule_name: &str) -> Self {
+    pub fn new(input_string: &str, starting_rule_name: &str) -> Self {
         EBNFParser {
             cur_pos: 0,
             input_string: input_string.into(),
@@ -128,7 +128,7 @@ impl EBNFParser {
     /// always be a production whose right-hand side is a single non-terminal. This
     /// is necessary for the algorithm in `[crate::table]`, which assumes this
     /// characteristic.
-    pub(crate) fn parse(mut self) -> Result<Grammar, ()> {
+    pub fn parse(mut self) -> Result<Grammar, ()> {
         // Preprocessing.
         // self.replace_square_brackets();
         // self.expand_templates();
@@ -167,8 +167,12 @@ impl EBNFParser {
                     .push(self.insert_nonterminal(production.clone(), ignore_nonterminal.clone()))
             }
 
-	    self.grammar.productions = new_productions;
+            self.grammar.productions = new_productions;
         }
+
+        // Include the special EOF symbol.
+        self.grammar.symbol_set.push("$".into());
+        self.grammar.terminals.push(Terminal::new("$", "", 0));
 
         Ok(self.grammar)
     }
@@ -885,6 +889,8 @@ impl EBNFParser {
     }
 
     /// Make a new, unique nonterminal name.
+    ///
+    /// TODO: Make these more readable by using more semantic information from the grammar.
     fn new_nonterminal(&mut self, annotation: &str) -> String {
         self.nonce += 1;
         format!("{}_{}", annotation, self.nonce)
@@ -916,10 +922,12 @@ mod tests {
                 "__ANONYMOUS_LITERAL_2".to_string(),
                 "c".to_string(),
                 "s".to_string(),
+                "$".to_string(),
             ],
             terminals: vec![
                 Terminal::new("__ANONYMOUS_LITERAL_1", "C", 0),
                 Terminal::new("__ANONYMOUS_LITERAL_2", "D", 0),
+                Terminal::new("$", "", 0),
             ],
             start_symbol: "s".to_string(),
             productions: vec![

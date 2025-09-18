@@ -565,15 +565,35 @@ mod tests {
         let Ok(grammar) = EBNFParser::new("s: c c\nc: \"C\" c | \"D\"", "s").parse() else {
             panic!()
         };
+
         let parser = Parser::new(&grammar);
-        eprintln!("{:#?}", parser.action_table);
+
         let Ok(lexer) = Lexer::new(grammar.terminals, HashSet::new()) else {
             panic!();
         };
+
         let Ok((tokens, remainder)) = lexer.lex(b"CC") else {
             panic!()
         };
-        eprintln!("{:#?}", parser.parse(tokens, remainder));
+
+        let Ok(accept_sequences) = parser.parse(tokens, remainder) else {
+            panic!()
+        };
+
+        assert!(
+            HashSet::from([
+                vec!["__ANONYMOUS_LITERAL_2".to_string()],
+                vec![
+                    "__ANONYMOUS_LITERAL_1".to_string(),
+                    "__ANONYMOUS_LITERAL_2".to_string()
+                ],
+                vec!["__ANONYMOUS_LITERAL_1".to_string()],
+                vec![
+                    "__ANONYMOUS_LITERAL_1".to_string(),
+                    "__ANONYMOUS_LITERAL_1".to_string()
+                ]
+            ]) == accept_sequences
+        );
     }
 
     #[test]

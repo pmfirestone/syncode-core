@@ -4,6 +4,7 @@
 use crate::dfa::all_dfa_states;
 use crate::types::*;
 use core::iter::Iterator;
+use rayon::prelude::*;
 use regex_automata::dfa::dense;
 use regex_automata::{Anchored, dfa::Automaton, util::primitives::StateID, util::start::Config};
 use std::collections::HashSet;
@@ -123,7 +124,7 @@ pub fn dfa_mask(
     dfa: &dense::DFA<Vec<u32>>,
     starting_state: &StateID,
     accept_sequence: &Vec<Terminal>,
-    vocabulary: &Vec<&[u8]>,
+    vocabulary: &Vec<Vec<u8>>,
 ) -> Vec<bool> {
     let mut mask: Vec<bool> = Vec::with_capacity(vocabulary.len());
     for token in vocabulary {
@@ -142,7 +143,7 @@ pub fn dfa_mask(
 /// future inferences.
 pub fn dfa_mask_store(
     lexical_terminals: &Vec<Terminal>,
-    model_vocabulary: Vec<&[u8]>,
+    model_vocabulary: Vec<Vec<u8>>,
     parser: &Parser,
     lexer: &Lexer,
     _length_of_terminal_sequences: usize,
@@ -331,12 +332,12 @@ mod tests {
     fn test_dfa_mask_name() {
         // Illustrative example from page 13 of the paper.
         let vocabulary = vec![
-            "_prime():".as_bytes(),
-            ":#".as_bytes(),
-            "¡".as_bytes(),
-            " hi".as_bytes(),
-            "indeed".as_bytes(),
-            "n0pe".as_bytes(),
+            "_prime():".as_bytes().into(),
+            ":#".as_bytes().into(),
+            "¡".as_bytes().into(),
+            " hi".as_bytes().into(),
+            "indeed".as_bytes().into(),
+            "n0pe".as_bytes().into(),
         ];
         let terminal_sequence = vec![
             Terminal::new("L_PAREN", r"\(", 0),
@@ -357,13 +358,13 @@ mod tests {
 
     #[test]
     fn test_dfa_mask_store() {
-        let model_vocabulary: Vec<&[u8]> = vec![
-            "_prime():".as_bytes(),
-            &[0xE2, 0x88],
-            "'''".as_bytes(),
-            " hi".as_bytes(),
-            "indeed".as_bytes(),
-            "n0pe".as_bytes(),
+        let model_vocabulary: Vec<Vec<u8>> = vec![
+            "_prime():".as_bytes().into(),
+            [0xE2, 0x88].into(),
+            "'''".as_bytes().into(),
+            " hi".as_bytes().into(),
+            "indeed".as_bytes().into(),
+            "n0pe".as_bytes().into(),
         ];
         let lexical_terminals = vec![
             Terminal::new("L_PAREN", r"\(", 0),

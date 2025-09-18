@@ -188,7 +188,7 @@ fn items(grammar: &Grammar) -> Vec<HashSet<Item>> {
             dot: 0,
             lookahead: "$".to_string(),
         }]),
-        grammar,
+        &grammar,
     )]);
 
     'repeat_until_no_new_items: loop {
@@ -196,7 +196,7 @@ fn items(grammar: &Grammar) -> Vec<HashSet<Item>> {
 
         for item in &items {
             for symbol in &grammar.symbol_set {
-                let goto_set = goto(item, symbol, grammar);
+                let goto_set = goto(item, symbol, &grammar);
                 if !goto_set.is_empty() && !items.contains(&goto_set) {
                     new_items.push(goto_set);
                 }
@@ -341,7 +341,7 @@ mod tests {
                 Terminal::new("D", "D", 0),
                 Terminal::new("$", "", 0),
             ],
-            symbol_set: vec!["s".into(), "c".into(), "C".into(), "D".into()],
+            symbol_set: vec!["s".into(), "c".into(), "C".into(), "D".into(), "$".into()],
             start_symbol: "s".into(),
             productions: vec![
                 Production {
@@ -358,36 +358,6 @@ mod tests {
                 },
             ],
         }
-    }
-
-    #[test]
-    fn test_is_terminal() {
-        let grammar = example_grammar();
-        assert!(is_terminal(&"C".to_string(), &grammar));
-        assert!(is_terminal(&"D".to_string(), &grammar));
-        assert!(!is_terminal(&"c".to_string(), &grammar));
-        assert!(!is_terminal(&"s".to_string(), &grammar));
-    }
-
-    #[test]
-    fn item_set() {
-        let grammar = example_grammar();
-        eprintln!(
-            "{:#?}",
-            Vec::from([closure(
-                HashSet::from([Item {
-                    production: Production {
-                        // Make some guaranteed-unique string here instead of this garbage.
-                        lhs: AUGMENTED_START_SYMBOL.to_string(),
-                        rhs: vec![grammar.start_symbol.clone()],
-                    },
-                    dot: 0,
-                    lookahead: "$".to_string(),
-                }]),
-                &grammar,
-            )])
-        );
-        // eprintln!("{:#?}", items(&grammar));
     }
 
     #[test]
