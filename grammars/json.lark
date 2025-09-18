@@ -31,6 +31,6 @@ _EXP: ("e"|"E") SIGNED_INT
 FLOAT: INT _EXP | DECIMAL _EXP?
 NUMBER: FLOAT | INT
 SIGNED_NUMBER: ["+"|"-"] NUMBER
-WS: /[ \t\f\r\n]/+
+WS: /[ \t\f\r\n]+/
 
 %ignore WS
