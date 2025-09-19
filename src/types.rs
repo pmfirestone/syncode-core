@@ -8,6 +8,8 @@ use regex_automata::{
     util::start::Config,
 };
 
+use serde::{Deserialize, Serialize};
+
 use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -134,6 +136,8 @@ pub struct Parser {
     pub goto_table: GotoTable,
     /// The index of the state to start at.
     pub start_state: usize,
+    /// The grammar this parser parses, for future reference.
+    pub grammar: Grammar,
 }
 
 /// A lexer.
@@ -147,6 +151,18 @@ pub struct Lexer {
     pub dfa: dense::DFA<Vec<u32>>,
     /// Maps DFA match pattern to the TerminalDef it represents.
     pub index_to_type: HashMap<usize, Terminal>,
+}
+
+impl Grammar {
+    /// Find the terminal of this name.
+    pub fn terminal_from_name(&self, name: &String) -> Option<Terminal> {
+        for terminal in &self.terminals {
+            if terminal.name == *name {
+                return Some(terminal.clone());
+            }
+        }
+        None
+    }
 }
 
 // Implementations.

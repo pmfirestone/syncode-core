@@ -143,7 +143,7 @@ pub fn dfa_mask(
 /// future inferences.
 pub fn dfa_mask_store(
     lexical_terminals: &Vec<Terminal>,
-    model_vocabulary: Vec<Vec<u8>>,
+    model_vocabulary: &Vec<Vec<u8>>,
     parser: &Parser,
     lexer: &Lexer,
     _length_of_terminal_sequences: usize,
@@ -174,11 +174,11 @@ pub fn dfa_mask_store(
 /// Compute the mask for a given accept sequence and remainder.
 ///
 /// Implement algorithm 2 from the paper.
-fn grammar_mask(
+pub fn grammar_mask(
     accept_sequences: &HashSet<Vec<Terminal>>,
     remainder: &Token,
     mask_store: DFAMaskStore,
-    model_vocabulary: &[&[u8]],
+    model_vocabulary: &Vec<Vec<u8>>,
 ) -> Vec<bool> {
     let mut mask: Vec<bool> = vec![false; model_vocabulary.len()];
     for accept_sequence in accept_sequences {
@@ -398,7 +398,7 @@ mod tests {
         let Ok(lexer) = Lexer::new(grammar.terminals) else {
             panic!()
         };
-        let store = dfa_mask_store(&lexical_terminals, model_vocabulary, &parser, &lexer, 2);
+        let store = dfa_mask_store(&lexical_terminals, &model_vocabulary, &parser, &lexer, 2);
         let starting_state = terminal.advance(terminal.start_state(), candidate_string);
         // println!("{:#?}", store);
         assert_eq!(

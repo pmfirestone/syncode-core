@@ -21,6 +21,7 @@ impl Parser {
             action_table,
             goto_table,
             start_state: 0,
+            grammar: grammar.clone(),
         }
     }
 
@@ -154,7 +155,7 @@ impl Parser {
         &self,
         tokens: Vec<Token>,
         remainder: Token,
-    ) -> Result<HashSet<Vec<String>>, ParserError> {
+    ) -> Result<HashSet<Vec<Terminal>>, ParserError> {
         let mut a0: Vec<String> = Vec::new();
         let mut a1: Vec<String> = Vec::new();
 
@@ -174,20 +175,41 @@ impl Parser {
 
         // There are two cases for accept sequences. See section 4.5 of the
         // paper and Algorithm 4, lines 15-21.
-        let mut accept_sequences: HashSet<Vec<String>> = HashSet::new();
+        let mut accept_sequences: HashSet<Vec<Terminal>> = HashSet::new();
         if last_token == remainder {
             // Case 1: the remainder is the last lexical token.
             let remainder_type = remainder.clone().terminal.unwrap().name;
+            let Some(remainder_terminal) = self.grammar.terminal_from_name(&remainder_type) else {
+                panic!("Failed to get terminal for terminal {remainder_type}")
+            };
             for terminal in a1 {
-                accept_sequences.insert(vec![remainder_type.clone(), terminal]);
+                accept_sequences.insert(vec![
+                    remainder_terminal.clone(),
+                    match self.grammar.terminal_from_name(&terminal) {
+                        Some(terminal) => terminal,
+                        None => {
+                            panic!("Failed to get terminal for terminal {terminal}")
+                        }
+                    },
+                ]);
             }
             for terminal in a0 {
-                accept_sequences.insert(vec![terminal]);
+                accept_sequences.insert(vec![match self.grammar.terminal_from_name(&terminal) {
+                    Some(terminal) => terminal,
+                    None => {
+                        panic!("Failed to get terminal for terminal {terminal}")
+                    }
+                }]);
             }
         } else {
             // Case 2: the remainder is some unparsed nonsense.
             for terminal in a1 {
-                accept_sequences.insert(vec![terminal]);
+                accept_sequences.insert(vec![match self.grammar.terminal_from_name(&terminal) {
+                    Some(terminal) => terminal,
+                    None => {
+                        panic!("Failed to get terminal for terminal {terminal}")
+                    }
+                }]);
             }
         }
         Ok(accept_sequences)
@@ -437,6 +459,24 @@ mod tests {
             action_table,
             goto_table,
             start_state: 0,
+            // FIXME: Make this actually what it's supposed to be; for now,
+            // just make the compiler happy.
+            grammar: Grammar {
+                symbol_set: vec![
+                    "goal".into(),
+                    "sums".into(),
+                    "PLUS".into(),
+                    "products".into(),
+                    "STAR".into(),
+                    "value".into(),
+                    "DEC_NUMBER".into(),
+                    "WORD".into(),
+		    "$".into()
+                ],
+                terminals: vec![plus(), star(), dec_number(), word(), eof()],
+                start_symbol: "goal".to_string(),
+                productions: calc_rules(),
+            },
         }
     }
 
@@ -520,9 +560,9 @@ mod tests {
         // possibly become a WORD and could only continue to be a DEC_NUMBER.
         assert_eq!(
             HashSet::from([
-                vec!["DEC_NUMBER".into(), "STAR".into()],
-                vec!["DEC_NUMBER".into(), "PLUS".into()],
-                vec!["DEC_NUMBER".into(), "$".into()],
+                vec![dec_number(), star()],
+                vec![dec_number(), plus()],
+                vec![dec_number(), eof()],
             ]),
             accept_sequences
         );
