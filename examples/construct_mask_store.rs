@@ -28,9 +28,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
 
     // println!("{:#?}", byte_tokens[32]);
-    let mask_store = dfa_mask_store(&grammar.terminals, &byte_tokens, &parser, &lexer, 2);
+    let mask_store = dfa_mask_store(&grammar.terminals, &byte_tokens, &parser, 2);
 
-    let mut cache = fs::File::open("./cache/{model_id}/{language}.json")?;
+    // let mut cache = fs::File::open("./cache/{model_id}/{language}.json")?;
 
     // ser::to_writer(cache, &mask_store);
 
@@ -52,7 +52,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         panic!()
     };
 
-    let mask = grammar_mask(&accept_sequences, &remainder, mask_store, &byte_tokens);
+    let mask = grammar_mask(
+        &accept_sequences,
+        &remainder,
+        mask_store,
+        &byte_tokens,
+        &grammar,
+    );
 
     println!("{:#?}", mask);
     Ok(())
