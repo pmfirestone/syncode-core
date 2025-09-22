@@ -11,6 +11,15 @@ start: expr
 ?factor: NUMBER        -> number
        | "(" expr ")"
 
-%import common.NUMBER
-%import common.WS
+
+DIGIT: "0".."9"
+HEXDIGIT: "a".."f"|"A".."F"|DIGIT
+INT: DIGIT+
+SIGNED_INT: ["+"|"-"] INT
+DECIMAL: INT "." INT? | "." INT
+_EXP: ("e"|"E") SIGNED_INT
+FLOAT: INT _EXP | DECIMAL _EXP?
+NUMBER: FLOAT | INT
+
+WS: /[ \t\f\r\n]+/
 %ignore WS

@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let tokenizer = Tokenizer::from_pretrained(model_id, None)?;
     let vocab = tokenizer.get_vocab(false);
     let tokens: Vec<&String> = vocab.keys().collect();
-    let byte_tokens: Vec<Vec<u8>> = tokens.par_iter().map(|t| restore_bytes(t)).collect();
+    let byte_tokens: Vec<Vec<u8>> = tokens.into_par_iter().map(|t| restore_bytes(t)).collect();
 
     let Ok(grammar) = EBNFParser::new(&fs::read_to_string(grammar_file).unwrap(), "start").parse()
     else {

@@ -44,6 +44,12 @@ const CHAR_BYTES_MAP: Lazy<HashMap<char, u8>> = Lazy::new(char_bytes);
 /// Convert a string of unicode characters back to the bytes they represent.
 ///
 /// WARNING: This is surprisingly slow.
+///
+/// This has to return a Vec<u8>, because we don't know in advance how large
+/// the input string is going to be.
 pub fn restore_bytes(input: &String) -> Vec<u8> {
-    input.par_chars().map(|c| CHAR_BYTES_MAP[&c]).collect()
+    input
+        .par_chars()
+        .map(|c| CHAR_BYTES_MAP[&c])
+        .collect::<Vec<u8>>()
 }

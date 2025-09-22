@@ -21,6 +21,14 @@ FIXME:
 TODO:
 - Implement "maybe" blocks (square brackets).
 - Implement directives.
+
+There the the following limitations on the language this parser recognizes
+compared to that of Lark itself. Pull requests implementing these would be
+gladly accepted.
+
+- %ignore statements must be followed by either a regular expression or a string literal. Grammar-level operations are not supported.
+- %import statements are not supported.
+- Lookaround is not supported in regular expressions.
 !*/
 
 use crate::types::*;
