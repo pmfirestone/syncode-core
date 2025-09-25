@@ -618,7 +618,7 @@ impl EBNFParser {
 
         match self.cur_parsing {
             Item::RULE => {
-                let new_name = self.new_nonterminal("__ANONYMOUS_LITERAL");
+                let new_name = self.new_nonterminal(&*format!("__ANONYMOUS_LITERAL_{pattern}"));
                 self.grammar.symbol_set.push(new_name.clone());
                 self.grammar
                     .terminals
@@ -677,7 +677,7 @@ impl EBNFParser {
 
         match self.cur_parsing {
             Item::RULE => {
-                let new_name = self.new_nonterminal("__ANONYMOUS_LITERAL");
+                let new_name = self.new_nonterminal(&*format!("__ANONYMOUS_LITERAL_{pattern}"));
                 self.grammar.symbol_set.push(new_name.clone());
                 self.grammar
                     .terminals
@@ -981,15 +981,15 @@ mod tests {
         };
         let expected_grammar = Grammar {
             symbol_set: vec![
-                "__ANONYMOUS_LITERAL_1".to_string(),
-                "__ANONYMOUS_LITERAL_2".to_string(),
+                "__ANONYMOUS_LITERAL_C_1".to_string(),
+                "__ANONYMOUS_LITERAL_D_2".to_string(),
                 "c".to_string(),
                 "s".to_string(),
                 "$".to_string(),
             ],
             terminals: vec![
-                Terminal::new("__ANONYMOUS_LITERAL_1", "C", 0),
-                Terminal::new("__ANONYMOUS_LITERAL_2", "D", 0),
+                Terminal::new("__ANONYMOUS_LITERAL_C_1", "C", 0),
+                Terminal::new("__ANONYMOUS_LITERAL_D_2", "D", 0),
                 Terminal::new("$", "", 0),
             ],
             start_symbol: "s".to_string(),
@@ -1000,11 +1000,11 @@ mod tests {
                 },
                 Production {
                     lhs: "c".to_string(),
-                    rhs: vec!["__ANONYMOUS_LITERAL_1".to_string(), "c".to_string()],
+                    rhs: vec!["__ANONYMOUS_LITERAL_C_1".to_string(), "c".to_string()],
                 },
                 Production {
                     lhs: "c".to_string(),
-                    rhs: vec!["__ANONYMOUS_LITERAL_2".to_string()],
+                    rhs: vec!["__ANONYMOUS_LITERAL_D_2".to_string()],
                 },
             ],
             ignore_terminals: vec![],
