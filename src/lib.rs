@@ -8,6 +8,7 @@
 //! individual crates for further documentation.
 //!
 #![doc = include_str!("../README.md")]
+#![feature(test)]
 
 pub mod bytes;
 pub mod dfa;
