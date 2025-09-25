@@ -124,10 +124,7 @@ fn test_dfa_mask_store() {
             .get(&(
                 terminal.name,
                 starting_state,
-                vec![
-                    Terminal::new("L_PAREN", r"\(", 0).name,
-                    Terminal::new("R_PAREN", r"\)", 0).name,
-                ]
+                vec![Terminal::new("L_PAREN", r"\(", 0).name,]
             ))
             .unwrap(),
         &vec![true, false, false, false, true, false],
