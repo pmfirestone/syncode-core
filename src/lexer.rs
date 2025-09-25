@@ -30,12 +30,12 @@ pub enum LexError {
 impl Lexer {
     /// Construct a new lexer that recognizes the given `terminals` and ignores
     /// the `ignore_types`.
-    pub fn new(terminals: Vec<Terminal>) -> Result<Self, LexError> {
+    pub fn new(terminals: &Vec<Terminal>) -> Result<Self, LexError> {
         // Determine which patterns might contain newlines
         let mut newline_types: HashSet<Terminal> = HashSet::new();
         let mut index_to_type: HashMap<usize, Terminal> = HashMap::new();
 
-        for terminal in &terminals {
+        for terminal in terminals {
             if terminal.pattern.contains("\\n")
                 || terminal.pattern.contains("\n")
                 || terminal.pattern.contains("\\s")
@@ -78,7 +78,7 @@ impl Lexer {
             .map_err(|e| LexError::RegexError(format!("Failed to build DFA: {}", e)))?;
 
         Ok(Lexer {
-            terminals,
+            terminals: terminals.to_vec(),
             newline_types,
             dfa,
             index_to_type,
@@ -371,7 +371,7 @@ mod tests {
     fn lexer_initialization() {
         let terminal_defs = vec![word(), space()];
 
-        let Ok(lexer) = Lexer::new(terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminal_defs) else {
             panic!()
         };
 
@@ -384,7 +384,7 @@ mod tests {
         let terminal_defs = vec![word(), space()];
 
         // Initialize the lexer
-        let Ok(lexer) = Lexer::new(terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminal_defs) else {
             panic!()
         };
 
@@ -407,7 +407,8 @@ mod tests {
 
     #[test]
     fn expression() {
-        let Ok(lexer) = Lexer::new(vec![word(), star(), dec_number(), plus(), space()]) else {
+        let terminals = vec![word(), star(), dec_number(), plus(), space()];
+        let Ok(lexer) = Lexer::new(&terminals) else {
             panic!()
         };
 
@@ -435,7 +436,7 @@ mod tests {
     fn complex_string_literals() {
         let terminal_defs = vec![string(), word(), equals(), dot(), space()];
 
-        let Ok(lexer) = Lexer::new(terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminal_defs) else {
             panic!()
         };
 
@@ -562,7 +563,7 @@ mod tests {
             ),
         ];
 
-        let Ok(lexer) = Lexer::new(terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminal_defs) else {
             panic!()
         };
 
@@ -588,7 +589,7 @@ mod tests {
         // additions).
         let terminals = vec![word(), dec_number(), space()];
 
-        let Ok(lexer) = Lexer::new(terminals) else {
+        let Ok(lexer) = Lexer::new(&terminals) else {
             panic!()
         };
 
@@ -635,7 +636,7 @@ mod tests {
         // end, the remainder is unlexed suffix.
         let terminals = vec![word(), hex_number(), space()];
 
-        let Ok(lexer) = Lexer::new(terminals) else {
+        let Ok(lexer) = Lexer::new(&terminals) else {
             panic!()
         };
 
@@ -678,7 +679,7 @@ mod tests {
     fn multiline_tracking() {
         let terminal_defs = vec![word(), newline(), space()];
 
-        let Ok(lexer) = Lexer::new(terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminal_defs) else {
             panic!()
         };
 
