@@ -1,28 +1,3 @@
-// Modified from following grammar originally written for antlr:
-//
-//  [The "BSD licence"] Copyright (c) 2017 Sasa Coh, Michał Błotniak
-//  Copyright (c) 2019 Ivan Kochurkin, kvanttt@gmail.com, Positive Technologies 
-//  Copyright (c) 2019 Dmitry Rassadin, flipparassa@gmail.com,Positive Technologies All rights reserved. 
-//  Copyright (c) 2021 Martin Mirchev, mirchevmartin2203@gmail.com
-//  Copyright (c) 2023 Dmitry _litovchenko, i@dlitovchenko.ru
-
-//  Redistribution and use in source and binary forms, with or without modification, are permitted
-//  provided that the following conditions are met: 1. Redistributions of source code must retain the
-//  above copyright notice, this list of conditions and the following disclaimer. 2. Redistributions in
-//  binary form must reproduce the above copyright notice, this list of conditions and the following
-//  disclaimer in the documentation and/or other materials provided with the distribution. 3. The name
-//  of the author may not be used to endorse or promote products derived from this software without
-//  specific prior written permission.
-
-//  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
-//  BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MER"'chan" TABILITY AND FITNESS "for"  A PARTICULAR PURPOSE
-//  ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE "for"  ANY DIRECT, INDIRECT, INCIDENTAL,
-//  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-//  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-//  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-//  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN "if"  ADVISED OF THE
-//  POSSIBILITY OF SUCH DAMAGE.
-
 start: nls? package_clause eos (import_decl eos)* ((function_decl | method_decl | declaration) eos)*
 
 package_clause: package_token NAME
@@ -205,7 +180,7 @@ operand: literal | type_ | lparen_token expression ")" // removed NAME type_args
 
 literal: basic_lit | composite_lit | function_lit
 
-basic_lit: integer | string_ | FLOAT_LIT | CHAR_LIT
+basic_lit: integer | string_ | FLOAT_LIT | char_lit
 
 integer: DECIMAL_LIT | BINARY_LIT | OCTAL_LIT | HEX_LIT
 // integer: DECIMAL_LIT | BINARY_LIT | OCTAL_LIT | HEX_LIT | IMAGINARY_LIT | RUNE_LIT
@@ -215,7 +190,7 @@ HEX_LIT.2: /0x[\da-f]*/i
 OCTAL_LIT.2: /0o[0-7]*/i
 BINARY_LIT.2: /0b[0-1]*/i
 FLOAT_LIT.2: /((\d+\.\d*|\.\d+)(e[-+]?\d+)?|\d+(e[-+]?\d+))/i
-CHAR_LIT: /'/ (/[^'\\]/ | ESCAPED_VALUE) /'/
+char_lit: /'/ (/[^'\\]/ | ESCAPED_VALUE) /'/
 
 composite_lit: literal_type literal_value
 
@@ -235,13 +210,13 @@ struct_type: struct_token lbrace_token ((field_decl eos)* field_decl eos?)? "}"
 
 field_decl: ((identifier_list | NAME) type_ | embedded_field) string_?
 
-string_: RAW_STRING_LIT | INTERPRETED_STRING_LIT
+string_: RAW_STRING_LIT | interpreted_string_lit
 
 // RAW_STRING_LIT         : '`' ~'`'*                      '`' -> mode(NLSEMI);
 // INTERPRETED_STRING_LIT : '"' (~["\\] | ESCAPED_VALUE)*  '"' -> mode(NLSEMI);
 
 RAW_STRING_LIT: /`[^`]*`/s
-INTERPRETED_STRING_LIT: /"/ (/[^"\\]/ | ESCAPED_VALUE)* /"/
+interpreted_string_lit: /"/ (/[^"\\]/ | ESCAPED_VALUE)* /"/
 
 ESCAPED_VALUE: /\\(u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[abfnrtv\\'"]|[0-7]{3}|x[0-9a-fA-F]{2})/
 
@@ -295,15 +270,17 @@ map_token: "map" nls?
 struct_token: "struct" nls?
 
 eos: semi | nls
-semi: ";" NL*
-nls: NL+
+semi: ";" nl*
+nls: nl+
 	
 NAME : /[a-zA-Z_]\w*/
 
 COMMENT : /\/\/[^\n]*\n/
-NL: COMMENT | /(\r?\n[\t ]*)+/ | /\/\*(\*+[^*\/\n]|[^*\n])*\**\n(\*+[^*\/]|[^*])*\*+\//s
+nl: COMMENT | /(\r?\n[\t ]*)+/ | /\/\*(\*+[^*\/\n]|[^*\n])*\**\n(\*+[^*\/]|[^*])*\*+\//s
 
 // %import common.WS_INLINE
 // %ignore WS_INLINE
-IGNORED: /[\t ]/ | /\/\*(\*+[^*\/\n]|[^*\n])*\*+\//
+IGNORED: /[\t ]/
+IGNORED_B: /\/\*(\*+[^*\/\n]|[^*\n])*\*+\//
 %ignore IGNORED
+%ignore IGNORED_B
