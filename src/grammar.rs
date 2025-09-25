@@ -622,23 +622,20 @@ impl EBNFParser {
     /// `name: RULE | TOKEN`
     fn parse_name(&mut self) -> String {
         let input_string = self.input_string.clone();
+        let re_match: Match;
         if RULE_RE.is_match(&self.input_string[self.cur_pos..]) {
-            let rule_match = RULE_RE.find(&input_string[self.cur_pos..]).unwrap();
-            self.consume(rule_match.len());
-            self.grammar
-                .symbol_set
-                .push(rule_match.as_str().to_string());
-            return rule_match.as_str().into();
+            re_match = RULE_RE.find(&input_string[self.cur_pos..]).unwrap();
         } else if TOKEN_RE.is_match(&self.input_string[self.cur_pos..]) {
-            let token_match = TOKEN_RE.find(&input_string[self.cur_pos..]).unwrap();
-            self.consume(token_match.len());
-            self.grammar
-                .symbol_set
-                .push(token_match.as_str().to_string());
-            return token_match.as_str().into();
+            re_match = TOKEN_RE.find(&input_string[self.cur_pos..]).unwrap();
         } else {
-            self.report_parse_error("Expected a RULE or a TOKEN.")
+            return self.report_parse_error("Expected a RULE or a TOKEN.");
         }
+
+        self.consume(re_match.len());
+        // In case we haven't seen this token, yet, push it to the symbol
+        // set. Maybe unnecessary?
+        self.grammar.symbol_set.push(re_match.as_str().to_string());
+        return re_match.as_str().into();
     }
 
     /// Parse a regular expression.
