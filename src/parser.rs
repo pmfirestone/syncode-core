@@ -500,7 +500,8 @@ mod tests {
     #[test]
     fn end_to_end_parse() {
         let parser = calc_parser();
-        let Ok(lexer) = Lexer::new(vec![word(), star(), dec_number(), plus(), space()]) else {
+        let terminals = vec![word(), star(), dec_number(), plus(), space()];
+        let Ok(lexer) = Lexer::new(&terminals) else {
             panic!()
         };
 
