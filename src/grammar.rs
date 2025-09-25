@@ -101,7 +101,7 @@ const OP: &str = r"^[+\*\?]";
 const OP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(OP).unwrap());
 const VBAR: &str = r"^((\r?\n)+\s*)?\|";
 const VBAR_RE: Lazy<Regex> = Lazy::new(|| Regex::new(VBAR).unwrap());
-const NUMBER: &str = r"^(+|-)?[0-9]+";
+const NUMBER: &str = r"^(\+|-)?[0-9]+";
 const NUMBER_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NUMBER).unwrap());
 const RULE: &str = r"^!?[_?]?(?<name>[a-z][_a-z0-9]*)";
 const RULE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(RULE).unwrap());
@@ -199,6 +199,8 @@ impl EBNFParser {
             self.parse_priority();
         }
 
+        self.consume_space();
+
         if self.peek(0) == Some(':') {
             self.consume(1);
         } else {
@@ -229,6 +231,8 @@ impl EBNFParser {
         if self.peek(0) == Some('.') {
             self.parse_priority();
         }
+
+        self.consume_space();
 
         if self.peek(0) == Some(':') {
             self.consume(1);
