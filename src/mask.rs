@@ -149,38 +149,44 @@ pub fn dfa_mask_store(
 ) -> DFAMaskStore {
     let all_states = all_dfa_states(lexical_terminals);
     let mut store: DFAMaskStore = HashMap::new();
+
     for (terminal, state_id) in &all_states {
         let dfa = &terminal.dfa;
+
         // For now, hard-code the lookahead of two terminals.
         // let next_terminals = parser.next_terminals(&terminal.name);
-	// Lookahead of zero terminals.
-	let accept_sequence_names = vec![];
-	let accept_sequence_terminals = vec![];
-	store.insert(
+        // Lookahead of zero terminals.
+        let accept_sequence_names = vec![];
+        let accept_sequence_terminals = vec![];
+
+        store.insert(
             (terminal.name.clone(), *state_id, accept_sequence_names),
             dfa_mask(dfa, state_id, &accept_sequence_terminals, &model_vocabulary),
         );
+
         for next_terminal in lexical_terminals {
             // Lookahead of one terminal.
             let accept_sequence_names = vec![next_terminal.name.clone()];
             let accept_sequence_terminals = vec![next_terminal.clone()];
+
             store.insert(
                 (terminal.name.clone(), *state_id, accept_sequence_names),
                 dfa_mask(dfa, state_id, &accept_sequence_terminals, &model_vocabulary),
             );
-            // let after_next_terminals = parser.next_terminals(next_terminal);
-            for after_next_terminal in lexical_terminals {
-		// Lookahead of two terminals.
-                let accept_sequence_names =
-                    vec![next_terminal.name.clone(), after_next_terminal.name.clone()];
-                let accept_sequence_terminals =
-                    vec![next_terminal.clone(), after_next_terminal.clone()];
 
-                store.insert(
-                    (terminal.name.clone(), *state_id, accept_sequence_names),
-                    dfa_mask(dfa, state_id, &accept_sequence_terminals, &model_vocabulary),
-                );
-            }
+            // let after_next_terminals = parser.next_terminals(next_terminal);
+            // for after_next_terminal in lexical_terminals {
+            //     // Lookahead of two terminals.
+            //     let accept_sequence_names =
+            //         vec![next_terminal.name.clone(), after_next_terminal.name.clone()];
+            //     let accept_sequence_terminals =
+            //         vec![next_terminal.clone(), after_next_terminal.clone()];
+
+            //     store.insert(
+            //         (terminal.name.clone(), *state_id, accept_sequence_names),
+            //         dfa_mask(dfa, state_id, &accept_sequence_terminals, &model_vocabulary),
+            //     );
+            // }
         }
     }
     store
