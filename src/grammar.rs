@@ -180,14 +180,14 @@ impl EBNFParser {
     /// expanded by the time this procedure is called.
     fn parse_rule(&mut self) {
         // We know there's a match because this method is only called after
-        // we've already determined that the next thing is a rule.
-        // Remove the leading ? or !, if any, because we don't care about it.
+        // we've already determined that the next thing is a rule. The regex
+        // RULE_RE removes the leading ? or !, if any, because we don't care
+        // about it.
         let rule_match = RULE_RE
             .captures(&self.input_string[self.cur_pos..])
             .unwrap();
         // eprintln!("{:?}", rule_match);
         self.cur_parsing = Item::RULE;
-        // Remove the leading ? or !, if any, because we don't care about it.
         self.name_stack.push(rule_match["name"].into());
         self.consume(rule_match[0].len());
 
