@@ -30,7 +30,10 @@ pub enum LexError {
 impl Lexer {
     /// Construct a new lexer that recognizes the given `terminals` and ignores
     /// the `ignore_types`.
-    pub fn new(terminals: &Vec<Terminal>) -> Result<Self, LexError> {
+    pub fn new(
+        terminals: &Vec<Terminal>,
+        ignore_terminals: &Vec<String>,
+    ) -> Result<Self, LexError> {
         // Determine which patterns might contain newlines
         let mut newline_types: HashSet<Terminal> = HashSet::new();
         let mut index_to_type: HashMap<usize, Terminal> = HashMap::new();
@@ -79,6 +82,7 @@ impl Lexer {
 
         Ok(Lexer {
             terminals: terminals.to_vec(),
+            ignore_terminals: ignore_terminals.to_vec(),
             newline_types,
             dfa,
             index_to_type,
@@ -174,6 +178,32 @@ impl Lexer {
         loop {
             // Try to match next token
             if let Some((value, terminal)) = self.match_token(text.into(), pos) {
+                let ignored = self.ignore_terminals.contains(&terminal.name);
+
+                // If this token is ignored, update position and continue the loop
+                if ignored {
+                    let contains_newline = self.newline_types.contains(terminal);
+
+                    // Update line and column information
+                    if contains_newline {
+                        // Calculate new line and column for tokens with newlines
+                        for &b in &value {
+                            if b == b'\n' {
+                                line += 1;
+                                column = 1;
+                            } else {
+                                column += 1;
+                            }
+                        }
+                    } else {
+                        column += value.len();
+                    }
+
+                    // Move position forward and continue the loop
+                    pos += value.len();
+                    continue;
+                }
+
                 // For non-ignored tokens, create and return the token
                 let start_pos = pos;
                 let end_pos = start_pos + value.len();
@@ -371,7 +401,7 @@ mod tests {
     fn lexer_initialization() {
         let terminal_defs = vec![word(), space()];
 
-        let Ok(lexer) = Lexer::new(&terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminal_defs, &vec![]) else {
             panic!()
         };
 
@@ -384,31 +414,31 @@ mod tests {
         let terminal_defs = vec![word(), space()];
 
         // Initialize the lexer
-        let Ok(lexer) = Lexer::new(&terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminal_defs, &vec!["SPACE".to_string()]) else {
             panic!()
         };
 
         // Lex a simple text
         let tokens = lexer.lex("hello world".as_bytes()).unwrap();
 
-        // Should have 3 tokens: "hello", " ", and "world"
-        // (plus one EOF marker)
-        assert_eq!(tokens.0.len(), 3);
+        // Should have 2 tokens: "hello", and "world".
+        assert_eq!(tokens.0.len(), 2);
 
         assert_eq!(&*tokens.0[0].value, "hello".as_bytes());
         assert_eq!(tokens.0[0].terminal, Some(word()));
 
-        assert_eq!(&*tokens.0[2].value, "world".as_bytes());
-        assert_eq!(tokens.0[2].terminal, Some(word()));
+        assert_eq!(&*tokens.0[1].value, "world".as_bytes());
+        assert_eq!(tokens.0[1].terminal, Some(word()));
 
         // The remainder should be the last token in the input.
-        assert_eq!(tokens.0[2], tokens.1);
+        assert_eq!(tokens.0[1], tokens.1);
     }
 
     #[test]
     fn expression() {
         let terminals = vec![word(), star(), dec_number(), plus(), space()];
-        let Ok(lexer) = Lexer::new(&terminals) else {
+        let ignore_terminals = vec!["SPACE".to_string()];
+        let Ok(lexer) = Lexer::new(&terminals, &ignore_terminals) else {
             panic!()
         };
 
@@ -434,9 +464,10 @@ mod tests {
 
     #[test]
     fn complex_string_literals() {
-        let terminal_defs = vec![string(), word(), equals(), dot(), space()];
+        let terminals = vec![string(), word(), equals(), dot(), space()];
+        let ignore_terminals = vec!["SPACE".to_string()];
 
-        let Ok(lexer) = Lexer::new(&terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminals, &ignore_terminals) else {
             panic!()
         };
 
@@ -451,15 +482,12 @@ mod tests {
             .map(|token| token.terminal.clone().unwrap())
             .collect();
 
-        assert_eq!(
-            token_types,
-            vec![word(), space(), equals(), space(), string(), dot()]
-        );
+        assert_eq!(token_types, vec![word(), equals(), string(), dot()]);
     }
 
     #[test]
     fn numeric_literals() {
-        let terminal_defs = vec![
+        let terminals = vec![
             float_number(),
             hex_number(),
             oct_number(),
@@ -470,6 +498,7 @@ mod tests {
             semicolon(),
             space(),
         ];
+        let ignore_terminals = vec!["SPACE".to_string()];
 
         // Test cases for numeric literals
         let test_cases = vec![
@@ -477,9 +506,9 @@ mod tests {
                 "x = 42;",
                 vec![
                     (word(), "x".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (equals(), "=".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (dec_number(), "42".as_bytes()),
                     (semicolon(), ";".as_bytes()),
                 ],
@@ -488,9 +517,9 @@ mod tests {
                 "hex = 0xFF;",
                 vec![
                     (word(), "hex".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (equals(), "=".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (hex_number(), "0xFF".as_bytes()),
                     (semicolon(), ";".as_bytes()),
                 ],
@@ -499,9 +528,9 @@ mod tests {
                 "oct = 0o77;",
                 vec![
                     (word(), "oct".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (equals(), "=".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (oct_number(), "0o77".as_bytes()),
                     (semicolon(), ";".as_bytes()),
                 ],
@@ -510,9 +539,9 @@ mod tests {
                 "bin = 0b1010;",
                 vec![
                     (word(), "bin".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (equals(), "=".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (bin_number(), "0b1010".as_bytes()),
                     (semicolon(), ";".as_bytes()),
                 ],
@@ -521,9 +550,9 @@ mod tests {
                 "pi = 3.14159;",
                 vec![
                     (word(), "pi".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (equals(), "=".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (float_number(), "3.14159".as_bytes()),
                     (semicolon(), ";".as_bytes()),
                 ],
@@ -532,9 +561,9 @@ mod tests {
                 "e = 2.71e-3;",
                 vec![
                     (word(), "e".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (equals(), "=".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (float_number(), "2.71e-3".as_bytes()),
                     (semicolon(), ";".as_bytes()),
                 ],
@@ -543,9 +572,9 @@ mod tests {
                 "val = .5;",
                 vec![
                     (word(), "val".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (equals(), "=".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (float_number(), ".5".as_bytes()),
                     (semicolon(), ";".as_bytes()),
                 ],
@@ -554,16 +583,16 @@ mod tests {
                 "sci = 6.022e23;",
                 vec![
                     (word(), "sci".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (equals(), "=".as_bytes()),
-                    (space(), " ".as_bytes()),
+                    // (space(), " ".as_bytes()),
                     (float_number(), "6.022e23".as_bytes()),
                     (semicolon(), ";".as_bytes()),
                 ],
             ),
         ];
 
-        let Ok(lexer) = Lexer::new(&terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminals, &ignore_terminals) else {
             panic!()
         };
 
@@ -588,8 +617,9 @@ mod tests {
         // lexical terminal (because that could change its type with future
         // additions).
         let terminals = vec![word(), dec_number(), space()];
+        let ignore_terminals = vec!["SPACE".to_string()];
 
-        let Ok(lexer) = Lexer::new(&terminals) else {
+        let Ok(lexer) = Lexer::new(&terminals, &ignore_terminals) else {
             panic!()
         };
 
@@ -597,7 +627,7 @@ mod tests {
         let (tokens, remainder) = lexer.lex(text).unwrap();
 
         // We expect:
-        // tokens: [123, space, ret]
+        // tokens: [123, ret]
         // remainder: ret
         assert_eq!(
             tokens[0],
@@ -614,7 +644,7 @@ mod tests {
         );
 
         assert_eq!(
-            tokens[2],
+            tokens[1],
             Token {
                 value: "ret".as_bytes().into(),
                 terminal: Some(word()),
@@ -627,7 +657,7 @@ mod tests {
             }
         );
 
-        assert_eq!(tokens[2], remainder);
+        assert_eq!(tokens[1], remainder);
     }
 
     #[test]
@@ -635,8 +665,9 @@ mod tests {
         // In the case where the string could not be lexed all the way to the
         // end, the remainder is unlexed suffix.
         let terminals = vec![word(), hex_number(), space()];
+        let ignore_terminals = vec!["SPACE".to_string()];
 
-        let Ok(lexer) = Lexer::new(&terminals) else {
+        let Ok(lexer) = Lexer::new(&terminals, &ignore_terminals) else {
             panic!()
         };
 
@@ -677,9 +708,10 @@ mod tests {
 
     #[test]
     fn multiline_tracking() {
-        let terminal_defs = vec![word(), newline(), space()];
+        let terminals = vec![word(), newline(), space()];
+        let ignore_terminals = vec!["SPACE".to_string()];
 
-        let Ok(lexer) = Lexer::new(&terminal_defs) else {
+        let Ok(lexer) = Lexer::new(&terminals, &ignore_terminals) else {
             panic!()
         };
 
