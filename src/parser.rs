@@ -15,14 +15,14 @@ use crate::types::*;
 
 impl Parser {
     /// Construct a new parser from a grammar.
-    pub fn new(grammar: &Grammar) -> Parser {
+    pub fn new(grammar: &Grammar) -> Result<Parser, ()> {
         let (action_table, goto_table) = tables(grammar.clone());
-        Parser {
+        Ok(Parser {
             action_table,
             goto_table,
             start_state: 0,
             grammar: grammar.clone(),
-        }
+        })
     }
 
     /// Return all the terminals that could come after this one, regardless of
@@ -573,7 +573,9 @@ mod tests {
                 ],
             }],
         };
-        let parser = Parser::new(&grammar);
+        let Ok(parser) = Parser::new(&grammar) else {
+            panic!()
+        };
         assert_eq!(
             parser.next_terminals(&"L_PAREN".to_string()),
             vec!["R_PAREN".to_string()]
