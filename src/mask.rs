@@ -48,16 +48,18 @@ pub fn dmatch(
     for &b in input {
         state = dfa.next_state(state, b);
     }
-    // Neither dead nor quit means we could match in the future and so are live.
+
     if !(dfa.is_dead_state(state) || dfa.is_quit_state(state)) {
+        // Neither dead nor quit means we could match in the future and so are live.
         return true;
     }
+
+    state = *starting_state; // Reset to initial state.
 
     // Case 2: The DFA consumes a prefix of the string, leaves a non-zero
     // suffix, and there is no sequence of terminals to follow. Assume that
     // grammars respect the maximum munch principle, so w1 is the maximal
     // matching prefix.
-    state = *starting_state; // Reset to initial state.
     let mut index_reached: usize = 0;
     for (i, &b) in input.iter().enumerate() {
         state = dfa.next_state(state, b);
@@ -79,9 +81,10 @@ pub fn dmatch(
         return true;
     }
 
+    state = *starting_state; // Reset to initial state.
+
     // Case 3: A prefix of the string is successfully consumed by the DFA, and
     // dmatch is true starting at the next member of sequence_of_terminals.
-    state = *starting_state;
     for (i, &b) in input.iter().enumerate() {
         state = dfa.next_state(state, b);
 
