@@ -335,6 +335,9 @@ impl Lexer {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+    use std::fs;
+    extern crate test;
+    use crate::grammar::EBNFParser;
 
     // Terminal definitions to be used throughout tests.
     fn word() -> Terminal {
@@ -737,5 +740,16 @@ mod tests {
 
         // The remainder should be the last token seen.
         assert_eq!(tokens.1, tokens.0[4]);
+    }
+
+    #[bench]
+    fn build_golang_lexer(b: &mut test::Bencher) {
+        let Ok(grammar) =
+            EBNFParser::new(&fs::read_to_string("grammars/go.lark").unwrap(), "start").parse()
+        else {
+            panic!()
+        };
+
+        b.iter(|| Lexer::new(&grammar.terminals, &grammar.ignore_terminals));
     }
 }

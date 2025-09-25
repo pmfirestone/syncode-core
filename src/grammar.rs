@@ -979,9 +979,12 @@ impl EBNFParser {
     }
 }
 
+#[cfg(test)]
 mod tests {
+    #![feature(test)]
     use super::*;
     use std::fs;
+    extern crate test;
 
     #[test]
     fn parse_simple_grammar() {
@@ -1031,5 +1034,12 @@ mod tests {
         );
         let grammar = parser.parse();
         println!("{:#?}", grammar.unwrap());
+    }
+
+    #[bench]
+    fn parse_golang_grammar(b: &mut test::Bencher) {
+        b.iter(|| {
+            EBNFParser::new(&fs::read_to_string("grammars/go.lark").unwrap(), "start").parse()
+        });
     }
 }

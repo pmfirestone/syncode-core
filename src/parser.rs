@@ -309,7 +309,10 @@ impl fmt::Display for ParserError {
 
 #[cfg(test)]
 mod tests {
+    extern crate test;
     use std::collections::{HashMap, HashSet};
+
+    use std::fs;
 
     use super::*;
     use crate::grammar::EBNFParser;
@@ -602,5 +605,16 @@ mod tests {
             parser.next_terminals(&"L_PAREN".to_string()),
             vec!["R_PAREN".to_string()]
         );
+    }
+
+    #[bench]
+    fn build_golang_parser(b: &mut test::Bencher) {
+        let Ok(grammar) =
+            EBNFParser::new(&fs::read_to_string("grammars/go.lark").unwrap(), "start").parse()
+        else {
+            panic!()
+        };
+
+        b.iter(|| Parser::new(&grammar));
     }
 }
