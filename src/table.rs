@@ -490,7 +490,9 @@ mod tests {
         // let json_action_table = action_table(&grammar);
         // let json_goto_table = goto_table(&grammar);
 
-        let parser = Parser::new(&grammar);
+        let Ok(parser) = Parser::new(&grammar) else {
+            panic!()
+        };
     }
 
     #[test]
