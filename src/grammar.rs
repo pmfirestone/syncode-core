@@ -199,6 +199,8 @@ impl EBNFParser {
             self.parse_priority();
         }
 
+        self.consume_space();
+
         if self.peek(0) == Some(':') {
             self.consume(1);
         } else {
@@ -229,6 +231,8 @@ impl EBNFParser {
         if self.peek(0) == Some('.') {
             self.parse_priority();
         }
+
+        self.consume_space();
 
         if self.peek(0) == Some(':') {
             self.consume(1);
