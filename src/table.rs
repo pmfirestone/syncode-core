@@ -392,6 +392,7 @@ mod tests {
                     rhs: vec!["D".into()],
                 },
             ],
+            ignore_terminals: vec![],
         }
     }
 

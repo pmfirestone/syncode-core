@@ -87,10 +87,10 @@ pub struct Grammar {
     pub start_symbol: String,
     /// The productions that make up this grammar, including the start_production.
     pub productions: Vec<Production>,
-    // /// The termnals that the lexer should ignore. FIXME: It's an aberration
-    // /// that this is here, because this field is not part of the abstract idea
-    // /// of what a grammar is.
-    // pub ignore_terminals: Vec<Terminal>
+    /// The termnals that the lexer should ignore. FIXME: It's an aberration
+    /// that this is here, because this field is not part of the abstract idea
+    /// of what a grammar is.
+    pub ignore_terminals: Vec<Terminal>,
 }
 
 /// An item of the item set for LR parsing.

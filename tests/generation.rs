@@ -98,6 +98,7 @@ fn test_dfa_mask_store() {
                 "start".to_string(),
             ],
         }],
+        ignore_terminals: vec![],
     };
     let Ok(parser) = Parser::new(&grammar) else {
         panic!()

@@ -455,6 +455,7 @@ mod tests {
                 terminals: vec![plus(), star(), dec_number(), word(), eof()],
                 start_symbol: "goal".to_string(),
                 productions: calc_rules(),
+                ignore_terminals: vec![],
             },
         }
     }
@@ -573,6 +574,7 @@ mod tests {
                     "start".to_string(),
                 ],
             }],
+            ignore_terminals: vec![],
         };
         let Ok(parser) = Parser::new(&grammar) else {
             panic!()

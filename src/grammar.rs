@@ -26,13 +26,20 @@ There the the following limitations on the language this parser recognizes
 compared to that of Lark itself. Pull requests implementing these would be
 gladly accepted.
 
-- %ignore statements must be followed by either a regular expression or a string literal. Grammar-level operations are not supported.
+- Terminals must be either a regular expression or a string literal. Defining
+  terminals in terms of other terminals using the ordinary constructs of the
+  grammar description language is not supported.
+
+- %ignore statements must be followed by either a regular expression or a
+  %string literal. Grammar-level operations are not supported.
+
 - %import statements are not supported.
+
 - Lookaround is not supported in regular expressions.
 !*/
 
 use crate::types::*;
-use regex::Regex;
+use regex::{Match, Regex};
 use regex_automata::util::lazy::Lazy;
 
 #[derive(PartialEq)]
@@ -40,6 +47,7 @@ enum Item {
     RULE,
     TOKEN,
     STATEMENT,
+    NONE,
 }
 
 /// Track the current state of parsing.
@@ -64,17 +72,12 @@ pub struct EBNFParser {
     name_stack: Vec<String>,
     /// The priority of the rule or token we are currently parsing. Defaults to 0.
     cur_priority: i32,
-    /// The right-hand side of the rule or token we are currently parsing.
-    cur_rhs: Vec<String>,
     /// Currently parsing a rule, token, or statement?
     cur_parsing: Item,
     /// A nonce value to use for generating unique new non-terminal names.
     nonce: usize,
     /// A temporary home for the terminals to ignore while we parse the grammar.
     ignore_terminals: Vec<String>,
-    /// A temporary home for terminals while we pars the grammar, before we
-    /// dissolve them into regular expressions.
-    temporary_terminals: Vec<Production>,
 }
 
 /// The terminals of the grammar description language.
@@ -115,13 +118,12 @@ impl EBNFParser {
                 terminals: vec![],
                 symbol_set: vec![],
                 start_symbol: starting_rule_name.into(),
+                ignore_terminals: vec![],
             },
-            temporary_terminals: vec![],
             cur_line: 1,
             cur_column: 1,
             name_stack: vec![],
             cur_priority: 0,
-            cur_rhs: vec![],
             cur_parsing: Item::RULE,
             nonce: 0,
             ignore_terminals: vec![],
@@ -207,17 +209,18 @@ impl EBNFParser {
 
         // We are no longer parsing a rule.
         self.name_stack.pop();
-        self.cur_rhs = vec![];
         self.cur_priority = 0;
+        self.cur_parsing = Item::NONE;
     }
 
     /// Parse a token.
     ///
-    /// `token: TOKEN priority? ":" <literals-and-or-terminals>`
+    /// `token: TOKEN priority? ":" REGEX | STRING | (STRING ".." STRING)`
     ///
     /// Note that the params that are present in the syntax have already been
     /// expanded by the time this procedure is called.
     fn parse_token(&mut self) {
+        self.cur_parsing = Item::TOKEN;
         let token_match = TOKEN_RE.find(&self.input_string[self.cur_pos..]).unwrap();
 
         self.name_stack.push(token_match.as_str().into());
@@ -235,34 +238,36 @@ impl EBNFParser {
 
         self.consume_space();
 
-        // match self.peek(0) {
-        //     Some('"') => { // string
-        //         // Process this string or literal range.
-        //     }
-        //     Some('/') => {
-        //         // regex
-        //         let regex = self.parse_regex();
-        //     }
-        //     Some('A'..'Z') => { // terminal
-        //     }
-        //     _ => { // error
-        //     }
-        // }
+        let value: String;
 
-        // We do something different here: tokens are always defined in terms
-        // of other tokens and are non-recursive. When we parse the grammar,
-        // we simply collect the terminals as they come.
+        match self.peek(0) {
+            Some('"') => {
+                // string
+                value = self.parse_string();
+            }
+            Some('/') => {
+                // regex
+                value = self.parse_regex();
+            }
+            _ => {
+                self.report_parse_error(
+                    "Expected a regular expression, a string, or a literal range.",
+                );
+                // Make the compiler happy, because the above procedure never returns.
+                return;
+            }
+        }
 
-        self.parse_expansions();
-
-        // self.temporary_terminals.push(Production {
-        //     lhs: self.name_stack.last().unwrap().to_string(),
-        //     rhs: vec![]
-        // });
+        self.grammar.terminals.push(Terminal::new(
+            self.name_stack.last().unwrap(),
+            &*value,
+            self.cur_priority,
+        ));
 
         // We are no longer parsing a token.
         self.name_stack.pop();
         self.cur_priority = 0;
+        self.cur_parsing = Item::NONE;
     }
 
     /// Parse a statement of the grammar.
@@ -536,7 +541,7 @@ impl EBNFParser {
         }
     }
 
-    /// Parse a value.
+    /// Parse a value, returning it.
     ///
     /// ```
     /// value: STRING ".." STRING -> literal_range
@@ -552,7 +557,11 @@ impl EBNFParser {
         }
     }
 
-    /// Parse a string
+    /// Parse a string (or range).
+    ///
+    /// If we're parsing a terminal, return a regex pattern matching the string
+    /// (or range). If we're parsing a rule, create a new anonymous terminal
+    /// and return its name.
     ///
     /// This procedure doesn't map neatly onto the grammar: we handle both
     /// literal strings and literal ranges by creating a new terminal.
@@ -607,14 +616,20 @@ impl EBNFParser {
             );
         }
 
-        // Encountered a string literal; make a new anonymous terminal.
-        let new_name = self.new_nonterminal("__ANONYMOUS_LITERAL");
-        self.grammar.symbol_set.push(new_name.clone());
-        self.grammar
-            .terminals
-            .push(Terminal::new(&new_name, &pattern, self.cur_priority));
-
-        return new_name;
+        match self.cur_parsing {
+            Item::RULE => {
+                let new_name = self.new_nonterminal("__ANONYMOUS_LITERAL");
+                self.grammar.symbol_set.push(new_name.clone());
+                self.grammar
+                    .terminals
+                    .push(Terminal::new(&new_name, &pattern, self.cur_priority));
+                return new_name;
+            }
+            Item::TOKEN => {
+                return pattern;
+            }
+            _ => self.report_parse_error("Unexpected string literal."),
+        }
     }
 
     /// Parse a name.
@@ -641,7 +656,7 @@ impl EBNFParser {
         }
     }
 
-    /// Parse a regular expression.
+    /// Parse a regular expression, returning a string of the regular expression.
     ///
     /// `REGEXP: /\/(?!\/)(\\\/|\\\\|[^\/])*?\/[imslux]*/`
     ///
@@ -658,17 +673,25 @@ impl EBNFParser {
             self.report_parse_error("Failed to parse regular expression.");
             return "".into();
         };
+
         self.consume(re_match[0].len());
         // Make a new anonymous terminal.
-        let new_name = self.new_nonterminal("__REGEX");
-        self.grammar.symbol_set.push(new_name.clone());
-        self.grammar.terminals.push(Terminal::new(
-            &new_name,
-            &re_match["pattern"],
-            self.cur_priority,
-        ));
+        let pattern = re_match["pattern"].to_string();
 
-        return new_name;
+        match self.cur_parsing {
+            Item::RULE => {
+                let new_name = self.new_nonterminal("__ANONYMOUS_LITERAL");
+                self.grammar.symbol_set.push(new_name.clone());
+                self.grammar
+                    .terminals
+                    .push(Terminal::new(&new_name, &pattern, self.cur_priority));
+                return new_name;
+            }
+            Item::TOKEN => {
+                return pattern;
+            }
+            _ => self.report_parse_error("Unexpected string literal."),
+        }
     }
 
     /// Handle a range of repetitions of the annotated item.
@@ -802,39 +825,7 @@ impl EBNFParser {
     /// except for productions that are already empty (to prevent infinite
     /// regression).
     fn handle_ignore_terminals(&mut self) {
-        if !self.ignore_terminals.is_empty() {
-            let (ignore_nonterminal, mut ignore_productions) = self.make_ignore_nonterminal();
-            let mut new_productions: Vec<Production> = vec![];
-
-            let descending_terminals: Vec<String> = self
-                .ignore_terminals
-                .clone()
-                .into_iter()
-                .map(|t| self.descendents(&t))
-                .collect::<Vec<_>>()
-                .into_iter()
-                .flatten()
-                .collect();
-
-            for production in &self.grammar.productions {
-                if production.rhs == vec!["".to_string()]
-                    || self.ignore_terminals.contains(&production.lhs)
-                    || descending_terminals.contains(&production.lhs)
-                {
-                    // Don't change productions that are already null.
-                    // Don't change productions that define this (non)terminal.
-                    new_productions.push(production.clone());
-                } else {
-                    new_productions.push(
-                        self.insert_nonterminal(production.clone(), ignore_nonterminal.clone()),
-                    )
-                }
-            }
-
-            new_productions.append(&mut ignore_productions);
-
-            self.grammar.productions = new_productions;
-        }
+        if !self.ignore_terminals.is_empty() {}
     }
 
     /// The symbols that "descend" from this one. A symbol descends
@@ -1019,6 +1010,7 @@ mod tests {
                     rhs: vec!["__ANONYMOUS_LITERAL_2".to_string()],
                 },
             ],
+            ignore_terminals: vec![],
         };
 
         assert_eq!(grammar, expected_grammar);
