@@ -21,16 +21,16 @@ NONEMPTY_STRING: /\"[^"]+\"/
 EMPTY_STRING: /\"\"/
 
 DIGIT: "0".."9"
-HEXDIGIT: "a".."f"|"A".."F"|DIGIT
-INT: DIGIT+
-SIGNED_INT: ["+"|"-"] INT
-DECIMAL: INT "." INT? | "." INT
+HEXDIGIT: /[a-fA-F0-9]/
+INT: /[0-9]+/
+SIGNED_INT: /[+-]?[0-9]+/
+DECIMAL: /[0-9]\.[0-9]*|\.[0-9]+/
 
 
-_EXP: ("e"|"E") SIGNED_INT
-FLOAT: INT _EXP | DECIMAL _EXP?
-NUMBER: FLOAT | INT
-SIGNED_NUMBER: ["+"|"-"] NUMBER
+_EXP: /[eE][+-]?[0-9]+/
+FLOAT: /([0-9]+[eE][+-]?[0-9]+)|([0-9]\.[0-9]+|\.[0-9]+)([eE][+-]?[0-9]+)?/
+NUMBER: /(([0-9]+[eE][+-]?[0-9]+)|([0-9]\.[0-9]+|\.[0-9]+)([eE][+-]?[0-9]+)?)|[0-9]+/
+SIGNED_NUMBER: /[+-]?(([0-9]+[eE][+-]?[0-9]+)|([0-9]\.[0-9]+|\.[0-9]+)([eE][+-]?[0-9]+)?)|[0-9]+/
 WS: /[ \t\f\r\n]+/
 
 %ignore WS

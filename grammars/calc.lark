@@ -12,14 +12,16 @@ start: expr
        | "(" expr ")"
 
 
-DIGIT: "0".."9"
-HEXDIGIT: "a".."f"|"A".."F"|DIGIT
-INT: DIGIT+
-SIGNED_INT: ["+"|"-"] INT
-DECIMAL: INT "." INT? | "." INT
-_EXP: ("e"|"E") SIGNED_INT
-FLOAT: INT _EXP | DECIMAL _EXP?
-NUMBER: FLOAT | INT
+#DIGIT: "0".."9"
+#HEXDIGIT: "a".."f"|"A".."F"|DIGIT
+#INT: DIGIT+
+#SIGNED_INT: ["+"|"-"] INT
+#DECIMAL: INT "." INT? | "." INT
+#_EXP: ("e"|"E") SIGNED_INT
+#FLOAT: INT _EXP | DECIMAL _EXP?
+#NUMBER: FLOAT | INT
+
+NUMBER: /(([0-9]+[eE][+-]?[0-9]+)|([0-9]\.[0-9]+|\.[0-9]+)([eE][+-]?[0-9]+)?)|[0-9]+/
 
 WS: /[ \t\f\r\n]+/
 %ignore WS
