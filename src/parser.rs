@@ -123,7 +123,8 @@ impl Parser {
                     };
 
                     // Get the next state for this state and nonterminal.
-                    let Some(next_state) = self.goto_table.get(&(*current_state, rule.lhs.clone()))
+                    let Some(next_state) =
+                        self.goto_table.get(&(*current_state, rule.lhs.to_string()))
                     else {
                         return Err(ParserError::InvalidState(*current_state));
                     };
@@ -386,34 +387,13 @@ mod tests {
     // Mega-simple grammar courtesy of https://en.wikipedia.org/wiki/LR_parser.
     fn calc_rules() -> Vec<Production> {
         vec![
-            Production {
-                lhs: "goal".into(),
-                rhs: vec!["sums".into(), "$".into()],
-            },
-            Production {
-                lhs: "sums".into(),
-                rhs: vec!["sums".into(), "PLUS".into(), "products".into()],
-            },
-            Production {
-                lhs: "sums".into(),
-                rhs: vec!["products".into()],
-            },
-            Production {
-                lhs: "products".into(),
-                rhs: vec!["products".into(), "STAR".into(), "value".into()],
-            },
-            Production {
-                lhs: "products".into(),
-                rhs: vec!["value".into()],
-            },
-            Production {
-                lhs: "value".into(),
-                rhs: vec!["DEC_NUMBER".into()],
-            },
-            Production {
-                lhs: "value".into(),
-                rhs: vec!["WORD".into()],
-            },
+            Production::new("goal", vec!["sums", "$"]),
+            Production::new("sums", vec!["sums", "PLUS", "products"]),
+            Production::new("sums", vec!["products"]),
+            Production::new("products", vec!["products", "STAR", "value"]),
+            Production::new("products", vec!["value"]),
+            Production::new("value", vec!["DEC_NUMBER"]),
+            Production::new("value", vec!["WORD"]),
         ]
     }
 
@@ -587,15 +567,10 @@ mod tests {
                 Terminal::new("$", "", 0),
             ],
             start_symbol: "start".to_string(),
-            productions: vec![Production {
-                lhs: "start".to_string(),
-                rhs: vec![
-                    "IDENTIFIER".to_string(),
-                    "L_PAREN".to_string(),
-                    "R_PAREN".to_string(),
-                    "start".to_string(),
-                ],
-            }],
+            productions: vec![Production::new(
+                "start",
+                vec!["IDENTIFIER", "L_PAREN", "R_PAREN", "start"],
+            )],
             ignore_terminals: vec![],
         };
         let Ok(parser) = Parser::new(&grammar) else {

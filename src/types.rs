@@ -14,7 +14,7 @@ use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
-use std::{cell::LazyCell, rc::Rc};
+use std::{cell::LazyCell, rc::Rc, sync::Arc};
 
 /// A lexical token, what the lexer breaks the input into.
 #[derive(Clone, Debug, PartialEq)]
@@ -63,11 +63,25 @@ pub struct NonTerminal {
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Production {
     /// The left hand side of the production.
-    pub lhs: String,
+    pub lhs: Arc<String>,
     /// The right hand side of the production.
-    pub rhs: Vec<String>,
+    pub rhs: Arc<Vec<String>>,
     // The priority of this production. Used to resolve conflicts when constructing the table.
     // pub priority: i32,
+}
+
+impl Production {
+    /// Convenience constructor for tests.
+    pub fn new(lhs: &str, rhs: Vec<&str>) -> Production {
+        Production {
+            lhs: lhs.to_string().into(),
+            rhs: rhs
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .into(),
+        }
+    }
 }
 
 /// A context-free grammar.

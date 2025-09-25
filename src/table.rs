@@ -48,18 +48,18 @@ fn symbol_first(symbol: &String, grammar: &Grammar) -> HashSet<String> {
         // eprintln!("nonterminal: {symbol}");
         // If symbol is a nonterminal...
         let mut first_set = HashSet::new();
-        for production in grammar.productions.iter().filter(|p| p.lhs == *symbol) {
+        for production in grammar.productions.iter().filter(|p| *p.lhs == *symbol) {
             // For each of the productions whose left hand side is symbol.
             let mut empty_flag = true;
             let mut first_of_this_production = HashSet::new();
 
-            if production.rhs == vec!["".to_string()] {
+            if *production.rhs == vec!["".to_string()] {
                 // If symbol -> ϵ is a production, add ϵ to first(symbol)
                 first_set.insert("".to_string());
                 continue;
             }
 
-            for inner_symbol in &production.rhs {
+            for inner_symbol in production.rhs.iter() {
                 // Place the contents of the first set of the resulting
                 // symbol into this symbol's first set...
                 if inner_symbol == symbol {
@@ -148,7 +148,8 @@ pub fn closure(mut items: HashSet<Item>, grammar: &Grammar) -> HashSet<Item> {
                     // check).
                     continue;
                 }
-                if production.lhs.clone() != item.production.rhs[item.dot] {
+
+                if *production.lhs != item.production.rhs[item.dot] {
                     // We only want the productions that begin with the symbol after the dot.
                     continue;
                 }
@@ -209,8 +210,8 @@ fn items(grammar: &Grammar) -> Vec<HashSet<Item>> {
         HashSet::from([Item {
             production: Production {
                 // Make some guaranteed-unique string here instead of this garbage.
-                lhs: AUGMENTED_START_SYMBOL.to_string(),
-                rhs: vec![grammar.start_symbol.clone()],
+                lhs: AUGMENTED_START_SYMBOL.to_string().into(),
+                rhs: vec![grammar.start_symbol.clone()].into(),
             },
             dot: 0,
             lookahead: "$".to_string(),
@@ -274,7 +275,7 @@ fn action_table(grammar: &Grammar) -> ActionTable {
             // If [A -> ɑ·, a] is in item_set_i, A != AUGMENTED_START_SYMBOL,
             // action_table[i, a] = reduce(A -> ɑ).
             if item.dot == item.production.rhs.len()
-                && item.production.lhs != AUGMENTED_START_SYMBOL
+                && *item.production.lhs != AUGMENTED_START_SYMBOL
             {
                 checked_insert(
                     state_id,
@@ -284,7 +285,7 @@ fn action_table(grammar: &Grammar) -> ActionTable {
                 );
             }
             // If [S' -> S·, EOF] is in item_set_i, then set action_table[i, EOF] to accept.
-            if item.production.lhs == AUGMENTED_START_SYMBOL
+            if *item.production.lhs == AUGMENTED_START_SYMBOL
                 && item.dot == item.production.rhs.len()
                 && item.lookahead == "$"
             {
@@ -386,16 +387,16 @@ mod tests {
             start_symbol: "s".into(),
             productions: vec![
                 Production {
-                    lhs: "s".into(),
-                    rhs: vec!["c".into(), "c".into()],
+                    lhs: "s".to_string().into(),
+                    rhs: vec!["c".into(), "c".into()].into(),
                 },
                 Production {
-                    lhs: "c".into(),
-                    rhs: vec!["C".into(), "c".into()],
+                    lhs: "c".to_string().into(),
+                    rhs: vec!["C".into(), "c".into()].into(),
                 },
                 Production {
-                    lhs: "c".into(),
-                    rhs: vec!["D".into()],
+                    lhs: "c".to_string().into(),
+                    rhs: vec!["D".into()].into(),
                 },
             ],
             ignore_terminals: vec![],
@@ -415,56 +416,26 @@ mod tests {
             ((2, "D".into()), Shift(7)),
             ((3, "C".into()), Shift(3)),
             ((3, "D".into()), Shift(4)),
-            (
-                (4, "C".into()),
-                Reduce(Production {
-                    lhs: "c".into(),
-                    rhs: vec!["D".into()],
-                }),
-            ),
-            (
-                (4, "D".into()),
-                Reduce(Production {
-                    lhs: "c".into(),
-                    rhs: vec!["D".into()],
-                }),
-            ),
+            ((4, "C".into()), Reduce(Production::new("c", vec!["D"]))),
+            ((4, "D".into()), Reduce(Production::new("c", vec!["D"]))),
             (
                 (5, "$".into()),
-                Reduce(Production {
-                    lhs: "s".into(),
-                    rhs: vec!["c".into(), "c".into()],
-                }),
+                Reduce(Production::new("s", vec!["c", "c"])),
             ),
             ((6, "C".into()), Shift(6)),
             ((6, "D".into()), Shift(7)),
-            (
-                (7, "$".into()),
-                Reduce(Production {
-                    lhs: "c".into(),
-                    rhs: vec!["D".into()],
-                }),
-            ),
+            ((7, "$".into()), Reduce(Production::new("c", vec!["D"]))),
             (
                 (8, "C".into()),
-                Reduce(Production {
-                    lhs: "c".into(),
-                    rhs: vec!["C".into(), "c".into()],
-                }),
+                Reduce(Production::new("c", vec!["C", "c"])),
             ),
             (
                 (8, "D".into()),
-                Reduce(Production {
-                    lhs: "c".into(),
-                    rhs: vec!["C".into(), "c".into()],
-                }),
+                Reduce(Production::new("c", vec!["C", "c"])),
             ),
             (
                 (9, "$".into()),
-                Reduce(Production {
-                    lhs: "c".into(),
-                    rhs: vec!["C".into(), "c".into()],
-                }),
+                Reduce(Production::new("c", vec!["C", "c"])),
             ),
         ]);
 

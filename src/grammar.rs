@@ -362,8 +362,8 @@ impl EBNFParser {
             // eprintln!("cur_alias: {:?}", cur_alias);
 
             self.grammar.productions.push(Production {
-                lhs: self.name_stack.last().unwrap().to_string(),
-                rhs: cur_alias,
+                lhs: self.name_stack.last().unwrap().to_string().into(),
+                rhs: cur_alias.into(),
             });
             self.grammar
                 .symbol_set
@@ -457,38 +457,32 @@ impl EBNFParser {
                 '*' => {
                     // Convert every repetition E* to a fresh non-terminal X
                     // and add X = $\epsilon$ | X E.
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec!["".to_string()],
-                    });
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec![new_nonterm.clone(), new_atom],
-                    });
+                    self.grammar
+                        .productions
+                        .push(Production::new(&new_nonterm, vec![""]));
+                    self.grammar
+                        .productions
+                        .push(Production::new(&new_nonterm, vec![&new_nonterm, &new_atom]));
                 }
                 '+' => {
                     // Convert every at-least-one repetition E+ to a fresh
                     // non-terminal X and add X = E | X E.
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec![new_atom.clone()],
-                    });
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec![new_nonterm.clone(), new_atom.clone()],
-                    });
+                    self.grammar
+                        .productions
+                        .push(Production::new(&new_nonterm, vec![&new_atom]));
+                    self.grammar
+                        .productions
+                        .push(Production::new(&new_nonterm, vec![&new_nonterm, &new_atom]));
                 }
                 '?' => {
                     // Convert every option E? to a fresh non-terminal X and
                     // add X = $\epsilon$ | E.
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec!["".to_string()],
-                    });
-                    self.grammar.productions.push(Production {
-                        lhs: new_nonterm.clone(),
-                        rhs: vec![new_atom.clone()],
-                    });
+                    self.grammar
+                        .productions
+                        .push(Production::new(&new_nonterm, vec![""]));
+                    self.grammar
+                        .productions
+                        .push(Production::new(&new_nonterm, vec![&new_atom]));
                 }
                 _ => { /* We should never reach this because we already matched above. */ }
             }
@@ -1011,18 +1005,9 @@ mod tests {
             ],
             start_symbol: "s".to_string(),
             productions: vec![
-                Production {
-                    lhs: "s".to_string(),
-                    rhs: vec!["c".to_string(), "c".to_string()],
-                },
-                Production {
-                    lhs: "c".to_string(),
-                    rhs: vec!["__ANONYMOUS_LITERAL_C_1".to_string(), "c".to_string()],
-                },
-                Production {
-                    lhs: "c".to_string(),
-                    rhs: vec!["__ANONYMOUS_LITERAL_D_2".to_string()],
-                },
+                Production::new("s", vec!["c", "c"]),
+                Production::new("c", vec!["__ANONYMOUS_LITERAL_C_1", "c"]),
+                Production::new("c", vec!["__ANONYMOUS_LITERAL_D_2"]),
             ],
             ignore_terminals: vec![],
         };

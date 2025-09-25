@@ -98,15 +98,10 @@ fn test_dfa_mask_store() {
         ],
         terminals: lexical_terminals.clone(),
         start_symbol: "start".to_string(),
-        productions: vec![Production {
-            lhs: "start".to_string(),
-            rhs: vec![
-                "IDENTIFIER".to_string(),
-                "L_PAREN".to_string(),
-                "R_PAREN".to_string(),
-                "start".to_string(),
-            ],
-        }],
+        productions: vec![Production::new(
+            "start",
+            vec!["IDENTIFIER", "L_PAREN", "R_PAREN", "start"].into(),
+        )],
         ignore_terminals: vec![],
     };
     let Ok(parser) = Parser::new(&grammar) else {
