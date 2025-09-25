@@ -12,6 +12,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use rayon::prelude::*;
+
 use crate::types::*;
 
 pub const AUGMENTED_START_SYMBOL: &str = "supersecretnewstart";
@@ -131,11 +133,12 @@ fn string_first(string: Vec<String>, grammar: &Grammar) -> HashSet<String> {
 /// Compute the closure of items.
 ///
 /// This algorithm is from sec. 4.7.2 of the Dragon Book 2e, p. 261.
-pub fn closure(items: HashSet<Item>, grammar: &Grammar) -> HashSet<Item> {
-    let mut item_set: HashSet<Item> = items;
+pub fn closure(mut items: HashSet<Item>, grammar: &Grammar) -> HashSet<Item> {
+    // let mut item_set: HashSet<Item> = items;
     'repeat: loop {
-        let old_item_set = item_set.clone();
-        for item in item_set.clone() {
+        let mut new_items: Vec<Item> = Vec::new();
+        let number_of_items = &items.len();
+        for item in items.iter() {
             // eprintln!("item: {:#?}", item);
             for production in &grammar.productions {
                 // eprintln!("production: {:#?}", production);
@@ -152,9 +155,10 @@ pub fn closure(items: HashSet<Item>, grammar: &Grammar) -> HashSet<Item> {
                 // Get the string made up of the symbols immediately after the
                 // symbol after the dot followed by the lookahead terminal.
                 let mut little_item_set = Vec::from(&item.production.rhs[(item.dot + 1)..]);
-                little_item_set.push(item.clone().lookahead);
+                little_item_set.push(item.lookahead.clone());
+
                 for terminal in string_first(little_item_set, grammar) {
-                    item_set.insert(Item {
+                    new_items.push(Item {
                         production: production.clone(),
                         dot: 0,
                         lookahead: terminal,
@@ -162,12 +166,14 @@ pub fn closure(items: HashSet<Item>, grammar: &Grammar) -> HashSet<Item> {
                 }
             }
         }
-        if item_set == old_item_set {
+
+        items.par_extend(new_items);
+        if items.len() == *number_of_items {
             // Repeat until no more items are added to item_set.
             break 'repeat;
         }
     }
-    item_set
+    items
 }
 
 /// Compute the goto set for a given rule set.
