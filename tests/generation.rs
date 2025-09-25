@@ -14,7 +14,7 @@ fn test_calc() {
         panic!()
     };
 
-    eprintln!("grammar: {:#?}", grammar);
+    // eprintln!("grammar: {:#?}", grammar);
 
     let model_vocabulary: Vec<Vec<u8>> = vec![
         b"1".into(),
@@ -28,7 +28,7 @@ fn test_calc() {
         panic!()
     };
 
-    eprintln!("action_table: {:#?}", parser.action_table);
+    // eprintln!("action_table: {:#?}", parser.action_table);
 
     let Ok(lexer) = Lexer::new(&grammar.terminals) else {
         panic!()
@@ -42,14 +42,14 @@ fn test_calc() {
         panic!()
     };
 
-    eprintln!("remainder: {}", remainder.value.as_bstr());
-    eprintln!("tokens: {:#?}", tokens);
+    // eprintln!("remainder: {}", remainder.value.as_bstr());
+    // eprintln!("tokens: {:#?}", tokens);
 
     let Ok(accept_sequences) = parser.parse(tokens, remainder.clone()) else {
         panic!()
     };
 
-    eprintln!("{:#?}", accept_sequences);
+    // eprintln!("{:#?}", accept_sequences);
 
     let mask = grammar_mask(
         &accept_sequences,
