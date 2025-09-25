@@ -342,12 +342,12 @@ fn checked_insert(state_id: usize, terminal: String, action: Action, table: &mut
         // As a special case, if the action we were going to insert is the same
         // as the one that's already there, we give a warning and continue.
         if table.get(&(state_id, terminal.clone())) == Some(&action) {
-            eprintln!(
-                "WARNING: While inserting an action into the action table, we found the same action we were going to insert.\nstate_id: {state_id}, terminal: {:#?}, existing action: {:#?}, new action: {:#?}",
-                terminal.clone(),
-                table.get(&(state_id, terminal.clone())),
-                action
-            );
+            // eprintln!(
+            //     "WARNING: While inserting an action into the action table, we found the same action we were going to insert.\nstate_id: {state_id}, terminal: {:#?}, existing action: {:#?}, new action: {:#?}",
+            //     terminal.clone(),
+            //     table.get(&(state_id, terminal.clone())),
+            //     action
+            // );
         } else {
             panic!(
                 "While inserting an action into the action table, discovered a conflicting action:\nstate_id: {state_id}, terminal: {:#?}, existing action: {:#?}, new action: {:#?}",

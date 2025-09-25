@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         panic!()
     };
 
-    let Ok(lexer) = Lexer::new(&grammar.terminals) else {
+    let Ok(lexer) = Lexer::new(&grammar.terminals, &grammar.ignore_terminals) else {
         panic!()
     };
 

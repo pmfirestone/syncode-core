@@ -12,7 +12,7 @@ fn parse_simple_grammar() {
         panic!()
     };
 
-    let Ok(lexer) = Lexer::new(&grammar.terminals) else {
+    let Ok(lexer) = Lexer::new(&grammar.terminals, &grammar.ignore_terminals) else {
         panic!();
     };
 
@@ -24,19 +24,20 @@ fn parse_simple_grammar() {
         panic!()
     };
 
-    assert!(
+    assert_eq!(
         HashSet::from([
-            vec!["__ANONYMOUS_LITERAL_2".to_string()],
+            vec!["__ANONYMOUS_LITERAL_D_2".to_string()],
             vec![
-                "__ANONYMOUS_LITERAL_1".to_string(),
-                "__ANONYMOUS_LITERAL_2".to_string()
+                "__ANONYMOUS_LITERAL_C_1".to_string(),
+                "__ANONYMOUS_LITERAL_D_2".to_string()
             ],
-            vec!["__ANONYMOUS_LITERAL_1".to_string()],
+            vec!["__ANONYMOUS_LITERAL_C_1".to_string()],
             vec![
-                "__ANONYMOUS_LITERAL_1".to_string(),
-                "__ANONYMOUS_LITERAL_1".to_string()
+                "__ANONYMOUS_LITERAL_C_1".to_string(),
+                "__ANONYMOUS_LITERAL_C_1".to_string()
             ]
-        ]) == accept_sequences
+        ]),
+        accept_sequences
     );
 }
 
@@ -54,9 +55,11 @@ fn parse_json() {
 
     // eprintln!("Grammar: {:#?}", grammar);
 
-    // let parser = Parser::new(&grammar);
+    let Ok(parser) = Parser::new(&grammar) else {
+        panic!()
+    };
 
-    let Ok(lexer) = Lexer::new(&grammar.terminals) else {
+    let Ok(lexer) = Lexer::new(&grammar.terminals, &grammar.ignore_terminals) else {
         panic!()
     };
 
@@ -81,4 +84,10 @@ fn parse_json() {
 
     // eprintln!("{:#?}", tokens);
     // eprintln!("{:#?}", remainder);
+
+    let Ok(accept_sequences) = parser.parse(tokens, remainder) else {
+        panic!()
+    };
+
+    eprintln!("{:#?}", accept_sequences);
 }

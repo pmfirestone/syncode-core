@@ -90,7 +90,7 @@ pub struct Grammar {
     /// The termnals that the lexer should ignore. FIXME: It's an aberration
     /// that this is here, because this field is not part of the abstract idea
     /// of what a grammar is.
-    pub ignore_terminals: Vec<Terminal>,
+    pub ignore_terminals: Vec<String>,
 }
 
 /// An item of the item set for LR parsing.
@@ -145,6 +145,8 @@ pub struct Parser {
 pub struct Lexer {
     /// The terminals this lexer recognizes.
     pub terminals: Vec<Terminal>,
+    /// The terminals this lexer ignores.
+    pub ignore_terminals: Vec<String>,
     /// The terminals that contain newlines.
     pub newline_types: HashSet<Terminal>,
     /// The DFA for matching patterns.

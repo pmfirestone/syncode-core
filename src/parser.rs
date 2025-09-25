@@ -27,6 +27,10 @@ impl Parser {
 
     /// Return all the terminals that could come after this one, regardless of
     /// the state the parser is in.
+    ///
+    /// FIXME: This only works for shift actions and fails (stack underflow)
+    /// for reduces. Reimplement this as a cleverer algorithm at the level of
+    /// the grammar.
     pub fn next_terminals(&self, terminal: &String) -> Vec<String> {
         let states_that_accept_this_terminal: Vec<usize> = self
             .action_table
@@ -72,6 +76,10 @@ impl Parser {
         // involved. Perhaps there's a way to make it more streamlined by
         // consolidating the error-managing boiler plate.
         let mut state_stack = state_stack;
+
+        // if self.grammar.ignore_terminals.contains(terminal) {
+        //     // Consume the terminal without modifying the state stack.
+        // }
 
         loop {
             // Get the current state.
@@ -159,10 +167,20 @@ impl Parser {
         let mut a0: Vec<String> = Vec::new();
         let mut a1: Vec<String> = Vec::new();
 
-        let last_token = tokens[tokens.len() - 1].clone();
+        let last_token = tokens.last().unwrap().clone();
         let mut state_stack = vec![self.start_state];
 
-        for token in &tokens[..] {
+        // eprintln!("{:#?}", state_stack);
+        for token in &tokens {
+            // Skip ignore terminals.
+            if self
+                .grammar
+                .ignore_terminals
+                .contains(&token.clone().terminal.unwrap().name)
+            {
+                continue;
+            }
+
             let terminal = token.clone().terminal.unwrap().name.clone();
             // FIXME: There must be a less horrid way to do this.
             let Ok(new_state_stack) = self.next(&terminal, state_stack) else {
@@ -171,6 +189,7 @@ impl Parser {
             state_stack = new_state_stack;
             a0 = a1;
             a1 = self.follow(&state_stack);
+            // eprintln!("{:#?}", state_stack);
         }
 
         // There are two cases for accept sequences. See section 4.5 of the
@@ -178,7 +197,7 @@ impl Parser {
         let mut accept_sequences: HashSet<Vec<String>> = HashSet::new();
         if last_token == remainder {
             // Case 1: the remainder is the last lexical token.
-            let remainder_type = remainder.clone().terminal.unwrap().name;
+            let remainder_type = last_token.clone().terminal.unwrap().name;
             for terminal in a1 {
                 accept_sequences.insert(vec![remainder_type.clone(), terminal]);
             }
@@ -191,6 +210,13 @@ impl Parser {
                 accept_sequences.insert(vec![terminal]);
             }
         }
+
+        for ignore_terminal in &self.grammar.ignore_terminals {
+            // We deal with ignore terminals by adding a special 1-long accept
+            // sequence for each ignore terminal.
+            accept_sequences.insert(vec![ignore_terminal.to_string()]);
+        }
+
         Ok(accept_sequences)
     }
 }
@@ -438,8 +464,6 @@ mod tests {
             action_table,
             goto_table,
             start_state: 0,
-            // FIXME: Make this actually what it's supposed to be; for now,
-            // just make the compiler happy.
             grammar: Grammar {
                 symbol_set: vec![
                     "goal".into(),
@@ -451,11 +475,12 @@ mod tests {
                     "DEC_NUMBER".into(),
                     "WORD".into(),
                     "$".into(),
+                    "SPACE".into(),
                 ],
-                terminals: vec![plus(), star(), dec_number(), word(), eof()],
+                terminals: vec![plus(), star(), dec_number(), word(), eof(), space()],
                 start_symbol: "goal".to_string(),
                 productions: calc_rules(),
-                ignore_terminals: vec![],
+                ignore_terminals: vec!["SPACE".into()],
             },
         }
     }
@@ -502,7 +527,8 @@ mod tests {
     fn end_to_end_parse() {
         let parser = calc_parser();
         let terminals = vec![word(), star(), dec_number(), plus(), space()];
-        let Ok(lexer) = Lexer::new(&terminals) else {
+        let ignore_terminals = vec!["SPACE".to_string()];
+        let Ok(lexer) = Lexer::new(&terminals, &ignore_terminals) else {
             panic!()
         };
 
@@ -529,18 +555,11 @@ mod tests {
             },
             remainder
         );
-        // It's not clear to me exactly what the semantics are here
-        // w.r.t. whitespace and other ignored terminals. Also, how do we deal
-        // with the possibilty that the remainder could change lexical type,
-        // even to types that aren't permitted? As it is, the algorithm allows
-        // a DEC_NUMBER to change to a WORD, even though that isn't actually
-        // possible in the grammar: semantically, what this says is that
-        // instead of being a DEC_NUMBER, the last lexical token could have
-        // been a WORD, which is technically true. Nevertheless, we already
-        // have enough information to know that the last token couldn't
-        // possibly become a WORD and could only continue to be a DEC_NUMBER.
         assert_eq!(
             HashSet::from([
+                vec!["DEC_NUMBER".to_string()],
+                vec!["WORD".to_string()],
+                vec!["SPACE".to_string()],
                 vec!["DEC_NUMBER".to_string(), "STAR".to_string()],
                 vec!["DEC_NUMBER".to_string(), "PLUS".to_string()],
                 vec!["DEC_NUMBER".to_string(), "$".to_string()],

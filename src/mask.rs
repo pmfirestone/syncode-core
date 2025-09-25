@@ -144,30 +144,38 @@ pub fn dfa_mask(
 pub fn dfa_mask_store(
     lexical_terminals: &Vec<Terminal>,
     model_vocabulary: &Vec<Vec<u8>>,
-    parser: &Parser,
+    _parser: &Parser,
     _length_of_terminal_sequences: usize,
 ) -> DFAMaskStore {
     let all_states = all_dfa_states(lexical_terminals);
     let mut store: DFAMaskStore = HashMap::new();
     for (terminal, state_id) in &all_states {
+        let dfa = &terminal.dfa;
         // For now, hard-code the lookahead of two terminals.
         // let next_terminals = parser.next_terminals(&terminal.name);
+	// Lookahead of zero terminals.
+	let accept_sequence_names = vec![];
+	let accept_sequence_terminals = vec![];
+	store.insert(
+            (terminal.name.clone(), *state_id, accept_sequence_names),
+            dfa_mask(dfa, state_id, &accept_sequence_terminals, &model_vocabulary),
+        );
         for next_terminal in lexical_terminals {
+            // Lookahead of one terminal.
+            let accept_sequence_names = vec![next_terminal.name.clone()];
+            let accept_sequence_terminals = vec![next_terminal.clone()];
+            store.insert(
+                (terminal.name.clone(), *state_id, accept_sequence_names),
+                dfa_mask(dfa, state_id, &accept_sequence_terminals, &model_vocabulary),
+            );
             // let after_next_terminals = parser.next_terminals(next_terminal);
             for after_next_terminal in lexical_terminals {
+		// Lookahead of two terminals.
                 let accept_sequence_names =
                     vec![next_terminal.name.clone(), after_next_terminal.name.clone()];
-                let accept_sequence_terminals = vec![
-                    parser
-                        .grammar
-                        .terminal_from_name(&next_terminal.name)
-                        .unwrap(),
-                    parser
-                        .grammar
-                        .terminal_from_name(&after_next_terminal.name)
-                        .unwrap(),
-                ];
-                let dfa = &terminal.dfa;
+                let accept_sequence_terminals =
+                    vec![next_terminal.clone(), after_next_terminal.clone()];
+
                 store.insert(
                     (terminal.name.clone(), *state_id, accept_sequence_names),
                     dfa_mask(dfa, state_id, &accept_sequence_terminals, &model_vocabulary),
@@ -202,11 +210,18 @@ pub fn grammar_mask(
                 // Get the relevant mask out of the store.
                 mask_store
                     .get(&(
-                        first_terminal.name,
+                        first_terminal.name.clone(),
                         end_state,
                         accept_sequence[1..].to_vec(),
                     ))
-                    .unwrap(),
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "The mask store does not contain the key ({}, {:?}, {:#?}).",
+                            first_terminal.name,
+                            end_state,
+                            accept_sequence[1..].to_vec()
+                        )
+                    }),
             )
             .enumerate()
             {

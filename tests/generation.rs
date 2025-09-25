@@ -1,4 +1,6 @@
 use bstr::ByteSlice;
+use regex_automata::dfa::Automaton;
+use syncode_core::dfa::{all_dfa_states, states};
 // tests/generation.rs
 use syncode_core::grammar::EBNFParser;
 use syncode_core::mask::{dfa_mask_store, grammar_mask};
@@ -29,27 +31,34 @@ fn test_calc() {
     };
 
     // eprintln!("action_table: {:#?}", parser.action_table);
+    // eprintln!("goto_table: {:#?}", parser.goto_table);
 
-    let Ok(lexer) = Lexer::new(&grammar.terminals) else {
+    let Ok(lexer) = Lexer::new(&grammar.terminals, &grammar.ignore_terminals) else {
         panic!()
     };
 
     let mask_store = dfa_mask_store(&grammar.terminals, &model_vocabulary, &parser, 2);
 
-    let prefix = b"1+1";
+    let prefix = b"1 + ";
 
     let Ok((tokens, remainder)) = lexer.lex(prefix) else {
         panic!()
     };
 
-    // eprintln!("remainder: {}", remainder.value.as_bstr());
-    // eprintln!("tokens: {:#?}", tokens);
+    eprintln!("remainder: {:#?}", remainder);
+    eprintln!("tokens: {:#?}", tokens);
 
     let Ok(accept_sequences) = parser.parse(tokens, remainder.clone()) else {
         panic!()
     };
 
-    // eprintln!("{:#?}", accept_sequences);
+    eprintln!("accept_sequences: {:#?}", accept_sequences);
+
+    // let number = grammar.terminal_from_name(&"NUMBER".to_string()).unwrap();
+
+    // let state = number.advance(number.start_state(), b"22");
+
+    // eprintln!("{:?}", states(&number.dfa));
 
     let mask = grammar_mask(
         &accept_sequences,
@@ -104,7 +113,7 @@ fn test_dfa_mask_store() {
         panic!()
     };
     // println!("{:#?}", parser);
-    let Ok(lexer) = Lexer::new(&grammar.terminals) else {
+    let Ok(lexer) = Lexer::new(&grammar.terminals, &grammar.ignore_terminals) else {
         panic!()
     };
     let store = dfa_mask_store(&lexical_terminals, &model_vocabulary, &parser, 2);

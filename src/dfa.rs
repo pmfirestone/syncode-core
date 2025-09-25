@@ -15,7 +15,7 @@ use std::collections::VecDeque;
 /// method that returns an iterator over all states. The suggested alternative
 /// is to traverse the graph manually. See
 /// <https://github.com/rust-lang/regex/discussions/1223>.
-fn states(dfa: &dense::DFA<Vec<u32>>) -> Vec<StateID> {
+pub fn states(dfa: &dense::DFA<Vec<u32>>) -> Vec<StateID> {
     let mut queue: VecDeque<StateID> = VecDeque::new();
     let mut explored: Vec<StateID> = Vec::new();
 

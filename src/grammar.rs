@@ -165,7 +165,7 @@ impl EBNFParser {
         self.grammar.symbol_set.dedup();
 
         // Make ignore terminals ignored, if any. This is a non-trivial task.
-        self.handle_ignore_terminals();
+        // self.handle_ignore_terminals();
 
         // Include the special EOF symbol.
         self.grammar.symbol_set.push("$".into());
@@ -264,6 +264,10 @@ impl EBNFParser {
             self.cur_priority,
         ));
 
+        self.grammar
+            .symbol_set
+            .push(self.name_stack.last().unwrap().to_string());
+
         // We are no longer parsing a token.
         self.name_stack.pop();
         self.cur_priority = 0;
@@ -300,7 +304,9 @@ impl EBNFParser {
                     self.report_parse_error("Expected token after %ignore statement.");
                     return;
                 };
-                self.ignore_terminals.push(token.as_str().to_string());
+                self.grammar
+                    .ignore_terminals
+                    .push(token.as_str().to_string());
                 self.consume(token.as_str().len());
             }
             "%de" => {
@@ -811,19 +817,23 @@ impl EBNFParser {
     /// but that is probably the most common use case.
     fn expand_extends(&mut self) {}
 
-    /// Insert the ignore terminals into each production.
-    ///
-    /// We do this instead of passing the ignore terminals on to the lexer so
-    /// that there aren't multiple kinds of terminals (lexer and parser) that
-    /// we have to juggle when building a mask: the ignore information is
-    /// already integrated directly into the grammar itself; the %ignore
-    /// notation is just syntactic sugar for putting the named terminal at the
-    /// beginning of each production and after each symbol in each production,
-    /// except for productions that are already empty (to prevent infinite
-    /// regression).
-    fn handle_ignore_terminals(&mut self) {
-        if !self.ignore_terminals.is_empty() {}
-    }
+    // /// Put the ignore terminals into the grammar as terminals.
+    // ///
+    // /// We do this at the end of parsing in case the ignore statement comes
+    // /// before the definition of the terminal it references.
+    // fn handle_ignore_terminals(&mut self) {
+    //     if !self.ignore_terminals.is_empty() {
+    //         for terminal_name in &self.ignore_terminals {
+    //             let Some(terminal) = self.grammar.terminal_from_name(&terminal_name) else {
+    //                 self.report_parse_error(&*format!(
+    //                     "The ignore terminal {terminal_name} is not defined"
+    //                 ));
+    //                 return;
+    //             };
+    //             self.grammar.ignore_terminals.push(terminal);
+    //         }
+    //     }
+    // }
 
     /// The symbols that "descend" from this one. A symbol descends
     /// from a symbol if it is on the right hand side of
