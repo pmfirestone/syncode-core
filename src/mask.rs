@@ -191,8 +191,7 @@ pub fn grammar_mask(
     let mut mask: Vec<bool> = vec![false; model_vocabulary.len()];
     for accept_sequence in accept_sequences {
         let first_terminal = grammar.terminal_from_name(&accept_sequence[0]).unwrap();
-        let start_state = first_terminal.start_state();
-        let end_state = first_terminal.advance(start_state, &remainder.value);
+        let end_state = first_terminal.advance(first_terminal.start_state(), &remainder.value);
         // Check whether the DFA ended up in a live state.
         if !(first_terminal.dfa.is_dead_state(end_state)
             || first_terminal.dfa.is_quit_state(end_state))
