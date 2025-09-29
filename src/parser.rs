@@ -162,17 +162,17 @@ impl Parser {
     /// in the tokens and remainder and returns only the accept sequences.
     pub fn parse(
         &self,
-        tokens: Vec<Token>,
-        remainder: Token,
+        tokens: &Vec<Token>,
+        remainder: &Token,
     ) -> Result<HashSet<Vec<String>>, ParserError> {
         let mut a0: Vec<String> = Vec::new();
         let mut a1: Vec<String> = Vec::new();
 
-        let last_token = tokens.last().unwrap().clone();
+        let last_token = tokens.last().unwrap_or(&EMPTY_TOKEN).clone();
         let mut state_stack = vec![self.start_state];
 
         // eprintln!("{:#?}", state_stack);
-        for token in &tokens {
+        for token in tokens {
             // Skip ignore terminals.
             if self
                 .grammar
@@ -196,7 +196,7 @@ impl Parser {
         // There are two cases for accept sequences. See section 4.5 of the
         // paper and Algorithm 4, lines 15-21.
         let mut accept_sequences: HashSet<Vec<String>> = HashSet::new();
-        if last_token == remainder {
+        if last_token == *remainder {
             // Case 1: the remainder is the last lexical token.
             let remainder_type = last_token.clone().terminal.unwrap().name;
             for terminal in a1 {
@@ -521,7 +521,7 @@ mod tests {
             panic!()
         };
 
-        let Ok(accept_sequences) = parser.parse(tokens, remainder.clone()) else {
+        let Ok(accept_sequences) = parser.parse(&tokens, &remainder) else {
             panic!()
         };
 

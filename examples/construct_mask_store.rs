@@ -51,14 +51,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         panic!()
     };
 
-    let Ok(accept_sequences) = parser.parse(terminals, remainder.clone()) else {
+    let Ok(accept_sequences) = parser.parse(&terminals, &remainder) else {
         panic!()
     };
 
     let mask = grammar_mask(
         &accept_sequences,
         &remainder,
-        mask_store,
+        &mask_store,
         &byte_tokens,
         &grammar,
     );

@@ -20,7 +20,7 @@ fn parse_simple_grammar() {
         panic!()
     };
 
-    let Ok(accept_sequences) = parser.parse(tokens, remainder) else {
+    let Ok(accept_sequences) = parser.parse(&tokens, &remainder) else {
         panic!()
     };
 
