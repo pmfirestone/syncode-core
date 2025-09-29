@@ -941,9 +941,9 @@ mod tests {
     }
 
     #[bench]
-    fn parse_golang_grammar(b: &mut test::Bencher) {
+    fn parse_json_grammar(b: &mut test::Bencher) {
         b.iter(|| {
-            EBNFParser::new(&fs::read_to_string("grammars/go.lark").unwrap(), "start").parse()
+            EBNFParser::new(&fs::read_to_string("grammars/json.lark").unwrap(), "start").parse()
         });
     }
 }

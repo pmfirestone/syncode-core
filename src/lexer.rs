@@ -290,20 +290,11 @@ impl Lexer {
         let mut line = 1;
         let mut column = 1;
 
-        // Start timing for performance measurement
-        let start_time = std::time::Instant::now();
-
         loop {
             let (new_token, is_remainder) = self.next_token(text, pos, line, column)?;
 
             if is_remainder {
                 // We should quit early, because we've seen all there is to see.
-                let elapsed = start_time.elapsed();
-                eprintln!(
-                    "Rust lexing completed in {:?} - produced {} tokens",
-                    elapsed,
-                    tokens.len()
-                );
                 return Ok((tokens, new_token));
             }
 
@@ -319,12 +310,6 @@ impl Lexer {
             remainder = new_token;
 
             if pos >= text.len() {
-                let elapsed = start_time.elapsed();
-                eprintln!(
-                    "Rust lexing completed in {:?} - produced {} tokens",
-                    elapsed,
-                    tokens.len()
-                );
                 return Ok((tokens, remainder));
             }
         }
@@ -743,9 +728,9 @@ mod tests {
     }
 
     #[bench]
-    fn build_golang_lexer(b: &mut test::Bencher) {
+    fn build_json_lexer(b: &mut test::Bencher) {
         let Ok(grammar) =
-            EBNFParser::new(&fs::read_to_string("grammars/go.lark").unwrap(), "start").parse()
+            EBNFParser::new(&fs::read_to_string("grammars/json.lark").unwrap(), "start").parse()
         else {
             panic!()
         };

@@ -581,15 +581,4 @@ mod tests {
             vec!["R_PAREN".to_string()]
         );
     }
-
-    #[bench]
-    fn build_golang_parser(b: &mut test::Bencher) {
-        let Ok(grammar) =
-            EBNFParser::new(&fs::read_to_string("grammars/go.lark").unwrap(), "start").parse()
-        else {
-            panic!()
-        };
-
-        b.iter(|| Parser::new(&grammar));
-    }
 }
