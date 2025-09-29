@@ -319,7 +319,6 @@ impl Lexer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
     use std::fs;
     extern crate test;
     use crate::grammar::EBNFParser;
