@@ -100,11 +100,11 @@ pub struct EBNFParser {
     cur_parsing: Item,
     /// A nonce value to use for generating unique new non-terminal names.
     nonce: usize,
-    /// A temporary home for the terminals to ignore while we parse the grammar.
-    ignore_terminals: Vec<String>,
 }
 
 /// The terminals of the grammar description language.
+///
+/// Manually specify the rexes we match and precompile them.
 ///
 /// We will use these to check the beginning of the string, so they all begin
 /// with a beginning-of-string anchor. This is because the Regex library does
@@ -115,7 +115,7 @@ pub struct EBNFParser {
 // Anchor these to the beginning of the string, because we will be using the regex
 // to pop the terminal off the beginning of the input.
 
-const STRING: &str = r#"^\"(?<content>.*?(\\)*?)\"(?<caseinvariant>i?)"#;
+const STRING: &str = r#"^(?s)"(?<content>.*?(\\)*?)\"(?<caseinvariant>i?)"#;
 const STRING_RE: Lazy<Regex> = Lazy::new(|| Regex::new(STRING).unwrap());
 const NL: &str = r"^(\r?\n)+\s*";
 const NL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(NL).unwrap());
@@ -150,7 +150,6 @@ impl EBNFParser {
             cur_priority: 0,
             cur_parsing: Item::RULE,
             nonce: 0,
-            ignore_terminals: vec![],
         }
     }
     /// Parse input_string into a Grammar and a Lexer.
@@ -205,14 +204,10 @@ impl EBNFParser {
     /// Note that the params that are present in the syntax have already been
     /// expanded by the time this procedure is called.
     fn parse_rule(&mut self) {
-        // We know there's a match because this method is only called after
-        // we've already determined that the next thing is a rule. The regex
-        // RULE_RE removes the leading ? or !, if any, because we don't care
-        // about it.
         let rule_match = RULE_RE
             .captures(&self.input_string[self.cur_pos..])
             .unwrap();
-        // eprintln!("{:?}", rule_match);
+
         self.cur_parsing = Item::RULE;
         self.name_stack.push(rule_match["name"].into());
         self.consume(rule_match[0].len());
@@ -228,7 +223,13 @@ impl EBNFParser {
         if self.peek(0) == Some(':') {
             self.consume(1);
         } else {
-            self.report_parse_error("Expected ':'.");
+            self.report_parse_error(&*format!(
+                "While parsing the rule {} with priority {}, we expected ':'.",
+                self.name_stack
+                    .last()
+                    .map_or("[FAILED TO GET NAME OF RULE]", |v| v),
+                self.cur_priority
+            ));
         }
 
         self.parse_expansions();
@@ -246,9 +247,9 @@ impl EBNFParser {
     /// Note that the params that are present in the syntax have already been
     /// expanded by the time this procedure is called.
     fn parse_token(&mut self) {
-        self.cur_parsing = Item::TOKEN;
         let token_match = TOKEN_RE.find(&self.input_string[self.cur_pos..]).unwrap();
 
+        self.cur_parsing = Item::TOKEN;
         self.name_stack.push(token_match.as_str().into());
         self.consume(token_match.len());
 
@@ -261,7 +262,13 @@ impl EBNFParser {
         if self.peek(0) == Some(':') {
             self.consume(1);
         } else {
-            self.report_parse_error("Expected ':'.");
+            self.report_parse_error(&*format!(
+                "While parsing the token {} with priority {}, we expected ':'.",
+                self.name_stack
+                    .last()
+                    .map_or("[FAILED TO GET NAME OF TOKEN]", |v| v),
+                self.cur_priority
+            ));
         }
 
         self.consume_space();

@@ -30,10 +30,10 @@ string: /"/ characters /"/
 characters: ""
           | character characters
 
-character: /[ -􏿿--["\\]]/
+character: /[\x{20} -\x{10FFFF}--["\\]]/
          | "\" escape
 
-escape: "\"" 
+escape: /"/
       | "\"
       | "/"
       | "b"
@@ -55,7 +55,7 @@ integer: digit
        | "-" onenine digits
 
 digits: digit
-      | digits digits
+      | digit digits
 
 digit: "0"
      | onenine
@@ -74,8 +74,7 @@ sign: ""
     | "-"
 
 ws: ""
-  | " " ws
-  | "
-" ws
-  | "" ws
-  | "	" ws
+  | /\x{0020}/ ws
+  | /\x{000A}/ ws
+  | /\x{000D}/ ws
+  | /\x{0009}/ ws
