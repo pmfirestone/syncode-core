@@ -11,10 +11,41 @@
 //! right now the goal is functioning code, nothing more, nothing less.
 
 use std::collections::{HashMap, HashSet};
-
+use crate::production::Production;
+use crate::grammar::Grammar;
 use rayon::prelude::*;
 
-use crate::types::*;
+/// An item of the item set for LR parsing.
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct Item {
+    /// The production that this item contains.
+    pub production: Production,
+    /// The position of the dot in the result. Invariant: must be in [0, result.len()].
+    pub dot: usize,
+    /// The look ahead terminal.
+    pub lookahead: String,
+}
+
+/// Action enum for LR parsing.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Action {
+    /// Consume a terminal from input, going to the indicated state.
+    Shift(usize),
+    /// Reduce the symbols on the stack according to the production.
+    Reduce(Production),
+    /// Accept the input.
+    Accept,
+    /// Fail to accept the input.
+    Error,
+}
+
+/// An action table is a map from a (state_id, terminal) pair to an action.
+pub type ActionTable = HashMap<(usize, String), Action>;
+
+/// A goto table is a map from a (state_id, nonterminal) pair to a state_id.
+pub type GotoTable = HashMap<(usize, String), usize>;
+
+
 
 pub const AUGMENTED_START_SYMBOL: &str = "supersecretnewstart";
 

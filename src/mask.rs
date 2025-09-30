@@ -1,19 +1,18 @@
 // src/mask.rd
 //! The mask store for SynCode, implementing the basic algorithm from the paper.
 
+use crate::Parser;
 use crate::dfa::all_dfa_states;
-use crate::types::*;
-use bstr::ByteSlice;
-use candle_transformers::generation::LogitsProcessor;
-use candle_transformers::models::llama::Llama;
+use crate::token::Token;
+use crate::terminal::Terminal;
+use crate::grammar::Grammar;
+
 use core::iter::Iterator;
-use rayon::prelude::*;
 use regex_automata::dfa::dense;
 use regex_automata::{Anchored, dfa::Automaton, util::primitives::StateID, util::start::Config};
 use std::collections::HashSet;
 use std::iter::zip;
 use std::{collections::HashMap, vec::Vec};
-use tokenizers::{Model, Tokenizer};
 
 /// DFA mask store stores, for each possible position we could be at in
 /// matching each terminal, and for each possible accept sequence that could

@@ -38,9 +38,33 @@ gladly accepted.
 - Lookaround is not supported in regular expressions.
 !*/
 
-use crate::types::*;
+use crate::production::Production;
+use crate::terminal::Terminal;
 use regex::{Match, Regex};
 use regex_automata::util::lazy::Lazy;
+
+/// A context-free grammar.
+///
+/// For now, distinguish between terminals and nonterminals by capitalization:
+/// nonterminals are lowercase and terminals are capitalized. This is highly
+/// limited: for one, not all characters have a case (languages such as Arabic,
+/// Hebrew, Chinese, Japanese, Korean lack case in their writing systems); for
+/// another, it imposes a silly formality on the user.
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct Grammar {
+    /// The set of symbols that are active in this grammar.
+    pub symbol_set: Vec<String>,
+    /// The set of terminals that are in this grammar.
+    pub terminals: Vec<Terminal>,
+    /// The original start symbol, not the augmented one we've added.
+    pub start_symbol: String,
+    /// The productions that make up this grammar, including the start_production.
+    pub productions: Vec<Production>,
+    /// The termnals that the lexer should ignore. FIXME: It's an aberration
+    /// that this is here, because this field is not part of the abstract idea
+    /// of what a grammar is.
+    pub ignore_terminals: Vec<String>,
+}
 
 #[derive(PartialEq)]
 enum Item {

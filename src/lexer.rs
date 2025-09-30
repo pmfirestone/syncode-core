@@ -2,6 +2,8 @@
 //! The lexer for SynCode. The primary procedure for this module is `lex`
 //! (q.v.), which takes a text and returns a sequence of lexical tokens along
 //! with a "remainder". See the paper for more detail.
+use crate::terminal::Terminal;
+use crate::token::Token;
 use regex_automata::dfa::{Automaton, StartKind, dense};
 use regex_automata::{Anchored, util::start};
 use std::collections::{HashMap, HashSet};
@@ -20,7 +22,6 @@ pub struct Lexer {
     /// Maps DFA match pattern to the TerminalDef it represents.
     pub index_to_type: HashMap<usize, Terminal>,
 }
-
 
 /// A type to describe errors that can arise in lexing.
 #[derive(Debug, Clone)]
@@ -669,12 +670,12 @@ mod tests {
         // The remainder is the longest suffix of the string that is an
         // incomplete prefix of a lexical terminal.
         let terminals = vec![
-	    dec_number(),
+            dec_number(),
             hex_number(),
             float_number(),
             space(),
-	    plus(),
-	    word(),
+            plus(),
+            word(),
             Terminal::new("FORALL", "∀", 0),
             Terminal::new("RETURN", "return", 0),
         ];
@@ -688,7 +689,7 @@ mod tests {
             (b"return 0x", b"0x"),
             (b"1 + 1.", b"1."),
             (b"return \xe2\x88", b"\xe2\x88"),
-	    (b"ret", b"ret")
+            (b"ret", b"ret"),
         ];
 
         for (input, expected) in examples {

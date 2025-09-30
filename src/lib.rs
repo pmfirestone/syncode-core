@@ -11,7 +11,7 @@ use grammar::EBNFParser;
 use mask::{DFAMaskStore, dfa_mask_store};
 use std::fs;
 use tokenizers::Tokenizer;
-use types::{Parser};
+use types::Parser;
 
 pub mod bytes;
 pub mod dfa;
@@ -19,9 +19,11 @@ pub mod generate;
 pub mod grammar;
 pub mod lexer;
 pub mod mask;
-pub mod terminal;
 pub mod parser;
+pub mod production;
 pub mod table;
+pub mod terminal;
+pub mod token;
 pub mod types;
 
 pub fn mask_store(model_id: &str, grammar_file: &str) -> DFAMaskStore {

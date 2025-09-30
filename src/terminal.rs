@@ -4,17 +4,19 @@ use regex_automata::{
     util::primitives::StateID,
     util::start::Config,
 };
-
-use std::rc::Rc;
+use std::cell::LazyCell;
+use std::fmt;
+use std::hash::Hash;
+use std::sync::Arc;
 /// A terminal of the grammar.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Terminal {
     /// The name of this terminal in the grammar.
     pub name: String,
     /// The regex describing this terminal.
     pub pattern: String,
     /// The DFA that matches this terminal.
-    pub dfa: Rc<dense::DFA<Vec<u32>>>,
+    pub dfa: Arc<dense::DFA<Vec<u32>>>,
     /// This terminal's priority in lexing.
     pub priority: i32,
 }

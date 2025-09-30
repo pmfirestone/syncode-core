@@ -2,7 +2,7 @@
 //! DFA helper functions. This module primarily exists to export
 //! `all_dfa_states`, which is used to construct the mask store.
 
-use crate::types::Terminal;
+use crate::terminal::Terminal;
 use regex_automata::{
     Anchored,
     dfa::{Automaton, dense},

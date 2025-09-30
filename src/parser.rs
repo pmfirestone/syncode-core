@@ -6,8 +6,40 @@ use std::cell::LazyCell;
 use std::collections::HashSet;
 use std::fmt;
 
-use crate::table::LRTables;
-use crate::types::*;
+use crate::table::{LRTables, ActionTable, GotoTable, Action};
+use crate::terminal::Terminal;
+use crate::token::Token;
+use crate::grammar::Grammar;
+
+/// The Parser with its tables.
+///
+/// We do not include the state stack as part of the parser struct, since it is
+/// easier by far to handle this struct as an immutable value and keep the
+/// stack as an argument that is passed in and out for each call.
+#[derive(Clone, Debug)]
+pub struct Parser {
+    /// The action table.
+    pub action_table: ActionTable,
+    /// The goto table.
+    pub goto_table: GotoTable,
+    /// The index of the state to start at.
+    pub start_state: usize,
+    /// The grammar this parser parses, for future reference.
+    pub grammar: Grammar,
+}
+
+impl Grammar {
+    /// Find the terminal of this name.
+    pub fn terminal_from_name(&self, name: &String) -> Option<Terminal> {
+        for terminal in &self.terminals {
+            if terminal.name == *name {
+                return Some(terminal.clone());
+            }
+        }
+        None
+    }
+}
+
 
 /// A special empty token for convenience.
 const EMPTY_TOKEN: LazyCell<Token> = LazyCell::new(|| Token {
