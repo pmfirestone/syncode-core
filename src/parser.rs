@@ -6,10 +6,10 @@ use std::cell::LazyCell;
 use std::collections::HashSet;
 use std::fmt;
 
-use crate::table::{LRTables, ActionTable, GotoTable, Action};
+use crate::grammar::Grammar;
+use crate::table::{Action, ActionTable, GotoTable, LRTables};
 use crate::terminal::Terminal;
 use crate::token::Token;
-use crate::grammar::Grammar;
 
 /// The Parser with its tables.
 ///
@@ -39,7 +39,6 @@ impl Grammar {
         None
     }
 }
-
 
 /// A special empty token for convenience.
 const EMPTY_TOKEN: LazyCell<Token> = LazyCell::new(|| Token {
@@ -353,10 +352,9 @@ mod tests {
     extern crate test;
     use std::collections::{HashMap, HashSet};
 
-    use std::fs;
-
     use super::*;
-    use crate::grammar::EBNFParser;
+    use crate::lexer::Lexer;
+    use crate::production::Production;
     // Terminal definitions to be used throughout tests. Commented out ones may
     // come in handy in future tests but are commented to avoid dead code warnings.
     fn word() -> Terminal {

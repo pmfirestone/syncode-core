@@ -3,9 +3,9 @@
 
 use crate::Parser;
 use crate::dfa::all_dfa_states;
-use crate::token::Token;
-use crate::terminal::Terminal;
 use crate::grammar::Grammar;
+use crate::terminal::Terminal;
+use crate::token::Token;
 
 use core::iter::Iterator;
 use regex_automata::dfa::dense;

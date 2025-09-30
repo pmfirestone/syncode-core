@@ -3,7 +3,7 @@ extern crate test;
 use std::collections::HashSet;
 use std::fs;
 use syncode_core::grammar::EBNFParser;
-use syncode_core::types::{Lexer, Parser};
+use syncode_core::{lexer::Lexer, parser::Parser};
 
 #[bench]
 fn build_json_parser(b: &mut test::Bencher) {

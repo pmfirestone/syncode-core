@@ -7,7 +7,11 @@ use syncode_core::bytes::restore_bytes;
 use syncode_core::grammar::EBNFParser;
 use syncode_core::mask::{dfa_mask_store, grammar_mask};
 use syncode_core::mask_store;
-use syncode_core::types::*;
+use syncode_core::parser::Parser;
+use syncode_core::lexer::Lexer;
+use syncode_core::grammar::Grammar;
+use syncode_core::production::Production;
+use syncode_core::terminal::Terminal;
 use tokenizers::Tokenizer;
 
 #[bench]

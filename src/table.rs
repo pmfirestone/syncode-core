@@ -10,9 +10,10 @@
 //! is work to be done here in cleaning the code and improving its efficiency;
 //! right now the goal is functioning code, nothing more, nothing less.
 
-use std::collections::{HashMap, HashSet};
-use crate::production::Production;
 use crate::grammar::Grammar;
+use crate::production::Production;
+use std::collections::{HashMap, HashSet};
+
 use rayon::prelude::*;
 
 /// An item of the item set for LR parsing.
@@ -44,8 +45,6 @@ pub type ActionTable = HashMap<(usize, String), Action>;
 
 /// A goto table is a map from a (state_id, nonterminal) pair to a state_id.
 pub type GotoTable = HashMap<(usize, String), usize>;
-
-
 
 pub const AUGMENTED_START_SYMBOL: &str = "supersecretnewstart";
 
@@ -436,9 +435,8 @@ impl LRTables {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use super::*;
+    use crate::terminal::Terminal;
     use Action::*;
 
     /// (4.55) from the Dragon Book 2e, section 4.7.2, p. 263.

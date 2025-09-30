@@ -9,10 +9,10 @@ use tokenizers::Tokenizer;
 
 use crate::{
     bytes::restore_bytes,
+    grammar::Grammar,
     lexer::Lexer,
     mask::{DFAMaskStore, grammar_mask},
-    types::{Parser},
-    grammar::Grammar
+    parser::Parser,
 };
 
 /// Generate a sequence constrained by a given grammar.

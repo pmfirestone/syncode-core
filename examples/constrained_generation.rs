@@ -4,11 +4,8 @@
 use candle_core::IntDType;
 use std::fs;
 use syncode_core::{
-    bytes::restore_bytes,
-    grammar::EBNFParser,
-    mask::grammar_mask,
-    mask_store,
-    types::{Lexer, Parser},
+    bytes::restore_bytes, grammar::EBNFParser, lexer::Lexer, mask::grammar_mask, mask_store,
+    parser::Parser,
 };
 use tokenizers::{Tokenizer, tokenizer};
 

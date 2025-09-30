@@ -1,11 +1,9 @@
 use rayon::prelude::*;
-use serde_json::{de, ser};
-use std::collections::HashSet;
 use std::fs;
 use syncode_core::bytes::restore_bytes;
 use syncode_core::grammar::EBNFParser;
 use syncode_core::mask::{dfa_mask_store, grammar_mask};
-use syncode_core::types::{Lexer, Parser};
+use syncode_core::{lexer::Lexer, parser::Parser};
 use tokenizers::Tokenizer;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

@@ -9,9 +9,9 @@
 use bytes::restore_bytes;
 use grammar::EBNFParser;
 use mask::{DFAMaskStore, dfa_mask_store};
+use parser::Parser;
 use std::fs;
 use tokenizers::Tokenizer;
-use types::Parser;
 
 pub mod bytes;
 pub mod dfa;
@@ -24,7 +24,6 @@ pub mod production;
 pub mod table;
 pub mod terminal;
 pub mod token;
-pub mod types;
 
 pub fn mask_store(model_id: &str, grammar_file: &str) -> DFAMaskStore {
     let tokenizer = Tokenizer::from_pretrained(model_id, None).unwrap();
