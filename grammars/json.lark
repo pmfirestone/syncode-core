@@ -1,36 +1,81 @@
-// Adapted from https://github.com/lapp0/outlines
-?start: start_value
+// Adapted from https://www.crockford.com/mckeeman.html
+json: element
 
-?start_value: object
-| array
+value: object
+     | array
+     | string
+     | number
+     | "true"
+     | "false"
+     | "null"
 
-?value: object
-| array
-| EMPTY_STRING
-| NONEMPTY_STRING
-| SIGNED_NUMBER      -> number
-| "true"             -> true
-| "false"            -> false
-| "null"             -> null
+object: "{" ws "}"
+      | "{" members "}"
 
-array  : "[" [value ("," value)*] "]"
-object : "{" [pair ("," pair)*] "}"
-pair   : NONEMPTY_STRING ":" value
+members: member
+       | member "," members
 
-NONEMPTY_STRING: /\"[^"]+\"/
-EMPTY_STRING: /\"\"/
+member: ws string ws ":" element
 
-DIGIT: "0".."9"
-HEXDIGIT: /[a-fA-F0-9]/
-INT: /[0-9]+/
-SIGNED_INT: /[+-]?[0-9]+/
-DECIMAL: /[0-9]\.[0-9]*|\.[0-9]+/
+array: "[" ws "]"
+     | "[" elements "]"
 
+elements: element
+        | element "," elements
 
-_EXP: /[eE][+-]?[0-9]+/
-FLOAT: /([0-9]+[eE][+-]?[0-9]+)|([0-9]\.[0-9]+|\.[0-9]+)([eE][+-]?[0-9]+)?/
-NUMBER: /(([0-9]+[eE][+-]?[0-9]+)|([0-9]\.[0-9]+|\.[0-9]+)([eE][+-]?[0-9]+)?)|[0-9]+/
-SIGNED_NUMBER: /[+-]?(([0-9]+[eE][+-]?[0-9]+)|([0-9]\.[0-9]+|\.[0-9]+)([eE][+-]?[0-9]+)?)|[0-9]+/
-WS: /[ \t\f\r\n]+/
+element: ws value ws
 
-%ignore WS
+string: /"/ characters /"/
+
+characters: ""
+          | character characters
+
+character: /[ -􏿿--["\\]]/
+         | "\" escape
+
+escape: "\"" 
+      | "\"
+      | "/"
+      | "b"
+      | "f"
+      | "n"
+      | "r"
+      | "t"
+      | "u" hex hex hex hex
+
+hex: digit
+   | "A".."F"
+   | "a".."f"
+
+number: integer fraction exponent
+
+integer: digit
+       | onenine digits
+       | "-" digit
+       | "-" onenine digits
+
+digits: digit
+      | digits digits
+
+digit: "0"
+     | onenine
+
+onenine: "1".."9"
+
+fraction: ""
+        | "." digits
+
+exponent: ""
+        | "E" sign digits
+	| "e" sign digits
+
+sign: ""
+    | "+"
+    | "-"
+
+ws: ""
+  | " " ws
+  | "
+" ws
+  | "" ws
+  | "	" ws

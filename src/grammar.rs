@@ -651,7 +651,7 @@ impl EBNFParser {
         }
 
         self.consume(re_match.len());
-        // In case we haven't seen this token, yet, push it to the symbol
+        // In case we haven't seen this token yet, push it to the symbol
         // set. Maybe unnecessary?
         self.grammar.symbol_set.push(re_match.as_str().to_string());
         return re_match.as_str().into();
@@ -894,7 +894,6 @@ impl EBNFParser {
 
 #[cfg(test)]
 mod tests {
-    #![feature(test)]
     use super::*;
     use std::fs;
     extern crate test;
@@ -931,13 +930,10 @@ mod tests {
     }
 
     #[test]
-    fn parse_json_grammar() {
-        let parser = EBNFParser::new(
-            &fs::read_to_string("./grammars/json.lark").unwrap(),
-            "start",
-        );
+    fn parse_go_grammar() {
+        let parser = EBNFParser::new(&fs::read_to_string("./grammars/go.lark").unwrap(), "start");
         let grammar = parser.parse();
-        println!("{:#?}", grammar.unwrap());
+        // println!("{:#?}", grammar.unwrap());
     }
 
     #[bench]

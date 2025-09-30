@@ -1,22 +1,17 @@
 // src/lib.rs
-//! A library for constrained generation using LLMs.
-//!
-//! We make far more of the crate public than is reasonable to facilitate
-//! development and to document the internals of the crate.
+//! Constrain is a library for probablistic grammar-guided generation.
 //!
 //! For an example of use see the file `examples/construct_mask_store.rs`. See
 //! individual crates for further documentation.
-//!
 #![doc = include_str!("../README.md")]
 #![feature(test)]
 
 use bytes::restore_bytes;
-use candle_core::ToUsize2;
 use grammar::EBNFParser;
 use mask::{DFAMaskStore, dfa_mask_store};
 use std::fs;
 use tokenizers::Tokenizer;
-use types::{Lexer, Parser};
+use types::{Parser};
 
 pub mod bytes;
 pub mod dfa;
@@ -24,6 +19,7 @@ pub mod generate;
 pub mod grammar;
 pub mod lexer;
 pub mod mask;
+pub mod terminal;
 pub mod parser;
 pub mod table;
 pub mod types;

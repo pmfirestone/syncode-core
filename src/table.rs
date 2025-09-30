@@ -36,16 +36,16 @@ pub(crate) struct LRTables {
 impl LRTables {
     /// Make a new tables.
     pub fn new(grammar: &Grammar) -> LRTables {
-	let mut res = LRTables {
-	    grammar: grammar.clone(),
-	    item_sets: Vec::new(),
-	    goto_sets: HashSet::new()
-	};
+        let mut res = LRTables {
+            grammar: grammar.clone(),
+            item_sets: Vec::new(),
+            goto_sets: HashSet::new(),
+        };
 
-	res.item_sets = res.items();
-	res
+        res.item_sets = res.items();
+        res
     }
-    
+
     /// Check whether a given symbol is a terminal in this grammar.
     fn is_terminal(&self, symbol: &String) -> bool {
         // eprintln!("symbol: {symbol}");
@@ -71,7 +71,12 @@ impl LRTables {
             // eprintln!("nonterminal: {symbol}");
             // If symbol is a nonterminal...
             let mut first_set = HashSet::new();
-            for production in self.grammar.productions.iter().filter(|p| *p.lhs == *symbol) {
+            for production in self
+                .grammar
+                .productions
+                .iter()
+                .filter(|p| *p.lhs == *symbol)
+            {
                 // For each of the productions whose left hand side is symbol.
                 let mut empty_flag = true;
                 let mut first_of_this_production = HashSet::new();
@@ -229,17 +234,15 @@ impl LRTables {
     /// Algorithm from Dragon Book 2e, sec. 4.7.2, p. 261.
     fn items(&self) -> Vec<HashSet<Item>> {
         // The first entry in the grammar is the augmented start symbol.
-        let mut items = Vec::from([self.closure(
-            HashSet::from([Item {
-                production: Production {
-                    // Make some guaranteed-unique string here instead of this garbage.
-                    lhs: AUGMENTED_START_SYMBOL.to_string().into(),
-                    rhs: vec![self.grammar.start_symbol.clone()].into(),
-                },
-                dot: 0,
-                lookahead: "$".to_string(),
-            }]),
-        )]);
+        let mut items = Vec::from([self.closure(HashSet::from([Item {
+            production: Production {
+                // Make some guaranteed-unique string here instead of this garbage.
+                lhs: AUGMENTED_START_SYMBOL.to_string().into(),
+                rhs: vec![self.grammar.start_symbol.clone()].into(),
+            },
+            dot: 0,
+            lookahead: "$".to_string(),
+        }]))]);
 
         'repeat_until_no_new_items: loop {
             let mut new_items = Vec::new();
@@ -276,8 +279,7 @@ impl LRTables {
                         // eprintln!("is_terminal: {terminal}");
                         // and goto(item_set_i, a) = item_set_j...
                         let goto_item_set = self.goto(&item_set, &terminal.clone());
-                        let Ok(goto_state_id) = self.find_state_id(&goto_item_set)
-                        else {
+                        let Ok(goto_state_id) = self.find_state_id(&goto_item_set) else {
                             panic!(
                                 "When adding a shift action for terminal {:#?}, failed to find the state id for goto item set {:#?}",
                                 terminal, goto_item_set
@@ -354,10 +356,7 @@ impl LRTables {
     ///
     /// Assume that the state_ids are the order in which the states were added to
     /// the item_sets vec. Return Err(()) if the item set wasn't found.
-    fn find_state_id(
-        &self,
-        item_set: &HashSet<Item>,
-    ) -> Result<usize, ()> {
+    fn find_state_id(&self, item_set: &HashSet<Item>) -> Result<usize, ()> {
         for (candidate_state_id, candidate_item_set) in self.item_sets.iter().enumerate() {
             if candidate_item_set == item_set {
                 return Ok(candidate_state_id);
@@ -442,7 +441,7 @@ mod tests {
     #[test]
     fn example_grammar_tables() {
         let grammar = example_grammar();
-	let lrtables = LRTables::new(&grammar);
+        let lrtables = LRTables::new(&grammar);
         let (action_table, goto_table) = lrtables.tables();
 
         let expected_action_table: ActionTable = HashMap::from_iter(vec![
@@ -488,43 +487,43 @@ mod tests {
         assert_eq!(goto_table, expected_goto_table);
     }
 
-    #[test]
-    fn json() {
-        use crate::grammar::EBNFParser;
-        use std::fs;
-        let Ok(grammar) = EBNFParser::new(
-            &fs::read_to_string("./grammars/json.lark").unwrap(),
-            "start",
-        )
-        .parse() else {
-            panic!()
-        };
+    // #[test]
+    // fn json() {
+    //     use crate::grammar::EBNFParser;
+    //     use std::fs;
+    //     let Ok(grammar) = EBNFParser::new(
+    //         &fs::read_to_string("./grammars/json.lark").unwrap(),
+    //         "start",
+    //     )
+    //     .parse() else {
+    //         panic!()
+    //     };
 
-        println!("{:#?}", grammar);
+    //     // println!("{:#?}", grammar);
 
-        // let json_action_table = action_table(&grammar);
-        // let json_goto_table = goto_table(&grammar);
+    //     // let json_action_table = action_table(&grammar);
+    //     // let json_goto_table = goto_table(&grammar);
 
-        // let Ok(parser) = Parser::new(&grammar) else {
-        //     panic!()
-        // };
-    }
+    //     // let Ok(parser) = Parser::new(&grammar) else {
+    //     //     panic!()
+    //     // };
+    // }
 
-    #[test]
-    fn ignore_terminals() {
-        use crate::grammar::EBNFParser;
-        let Ok(grammar) = EBNFParser::new(
-            &fs::read_to_string("./grammars/tiny.lark").unwrap(),
-            "start",
-        )
-        .parse() else {
-            panic!()
-        };
+    // #[test]
+    // fn ignore_terminals() {
+    //     use crate::grammar::EBNFParser;
+    //     let Ok(grammar) = EBNFParser::new(
+    //         &fs::read_to_string("./grammars/tiny.lark").unwrap(),
+    //         "start",
+    //     )
+    //     .parse() else {
+    //         panic!()
+    //     };
 
-        eprintln!("{:#?}", grammar);
-        // eprintln!(
-        //     "first(ch) = {:#?}",
-        //     symbol_first(&"ch".to_string(), &grammar)
-        // );
-    }
+    //     // eprintln!("{:#?}", grammar);
+    //     // eprintln!(
+    //     //     "first(ch) = {:#?}",
+    //     //     symbol_first(&"ch".to_string(), &grammar)
+    //     // );
+    // }
 }

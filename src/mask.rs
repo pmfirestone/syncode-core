@@ -3,6 +3,9 @@
 
 use crate::dfa::all_dfa_states;
 use crate::types::*;
+use bstr::ByteSlice;
+use candle_transformers::generation::LogitsProcessor;
+use candle_transformers::models::llama::Llama;
 use core::iter::Iterator;
 use rayon::prelude::*;
 use regex_automata::dfa::dense;
@@ -10,6 +13,7 @@ use regex_automata::{Anchored, dfa::Automaton, util::primitives::StateID, util::
 use std::collections::HashSet;
 use std::iter::zip;
 use std::{collections::HashMap, vec::Vec};
+use tokenizers::{Model, Tokenizer};
 
 /// DFA mask store stores, for each possible position we could be at in
 /// matching each terminal, and for each possible accept sequence that could
@@ -26,7 +30,7 @@ use std::{collections::HashMap, vec::Vec};
 /// > QΩ × Γα → {0, 1}|V |, where QΩ = ⋃ τ ∈Γ Qτ represents the set of all DFA
 /// > states and Γα is a set of α-length terminal sequences. Then Mα(q, Λ) = m is
 /// > a binary mask such that t ∈ set(m) if dmatch(t, q, Λ).
-type DFAMaskStore = HashMap<(String, StateID, Vec<String>), Vec<bool>>;
+pub type DFAMaskStore = HashMap<(String, StateID, Vec<String>), Vec<bool>>;
 
 /// Compute whether the string could match a sequence of terminals starting at a certain state in the first DFA.
 ///
@@ -201,7 +205,7 @@ pub fn dfa_mask_store(
 pub fn grammar_mask(
     accept_sequences: &HashSet<Vec<String>>,
     remainder: &Token,
-    mask_store: DFAMaskStore,
+    mask_store: &DFAMaskStore,
     model_vocabulary: &Vec<Vec<u8>>,
     grammar: &Grammar,
 ) -> Vec<bool> {

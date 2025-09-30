@@ -6,7 +6,21 @@ use regex_automata::dfa::{Automaton, StartKind, dense};
 use regex_automata::{Anchored, util::start};
 use std::collections::{HashMap, HashSet};
 
-use crate::types::*;
+/// A lexer.
+#[derive(Clone, Debug)]
+pub struct Lexer {
+    /// The terminals this lexer recognizes.
+    pub terminals: Vec<Terminal>,
+    /// The terminals this lexer ignores.
+    pub ignore_terminals: Vec<String>,
+    /// The terminals that contain newlines.
+    pub newline_types: HashSet<Terminal>,
+    /// The DFA for matching patterns.
+    pub dfa: dense::DFA<Vec<u32>>,
+    /// Maps DFA match pattern to the TerminalDef it represents.
+    pub index_to_type: HashMap<usize, Terminal>,
+}
+
 
 /// A type to describe errors that can arise in lexing.
 #[derive(Debug, Clone)]
@@ -651,46 +665,36 @@ mod tests {
     fn remainder_is_not_lexical_token() {
         // In the case where the string could not be lexed all the way to the
         // end, the remainder is unlexed suffix.
-        let terminals = vec![word(), hex_number(), space()];
+        //
+        // The remainder is the longest suffix of the string that is an
+        // incomplete prefix of a lexical terminal.
+        let terminals = vec![
+	    dec_number(),
+            hex_number(),
+            float_number(),
+            space(),
+	    plus(),
+	    word(),
+            Terminal::new("FORALL", "∀", 0),
+            Terminal::new("RETURN", "return", 0),
+        ];
         let ignore_terminals = vec!["SPACE".to_string()];
 
         let Ok(lexer) = Lexer::new(&terminals, &ignore_terminals) else {
             panic!()
         };
 
-        let text = "return 0x".as_bytes();
-        let (tokens, remainder) = lexer.lex(text).unwrap();
+        let examples: Vec<(&[u8], &[u8])> = vec![
+            (b"return 0x", b"0x"),
+            (b"1 + 1.", b"1."),
+            (b"return \xe2\x88", b"\xe2\x88"),
+	    (b"ret", b"ret")
+        ];
 
-        // We expect:
-        // tokens: [return]
-        // remainder: 0x
-        assert_eq!(
-            tokens[0],
-            Token {
-                value: "return".as_bytes().into(),
-                terminal: Some(word()),
-                start_pos: 0,
-                end_pos: 6,
-                line: 1,
-                column: 1,
-                end_line: 1,
-                end_column: 7
-            }
-        );
-
-        assert_eq!(
-            remainder,
-            Token {
-                value: "0x".as_bytes().into(),
-                terminal: None,
-                start_pos: 7,
-                end_pos: 9,
-                line: 1,
-                column: 8,
-                end_line: usize::MAX,
-                end_column: usize::MAX
-            }
-        );
+        for (input, expected) in examples {
+            let (_, remainder) = lexer.lex(input).unwrap();
+            assert_eq!(&*remainder.value, expected);
+        }
     }
 
     #[test]

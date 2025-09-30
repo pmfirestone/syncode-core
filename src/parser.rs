@@ -2,21 +2,29 @@
 //! The parser for SynCode. Takes in a lexed sequence of tokens and determines
 //! the accept sequences that could follow.
 
+use std::cell::LazyCell;
 use std::collections::HashSet;
 use std::fmt;
 
-use crate::table::tables;
+use crate::table::LRTables;
 use crate::types::*;
 
-// Rust RFC 1733 introduces this syntax as a way to alias bounds, which would
-// make this module much more readable. Unfortunately, as of 2025-05-09, the
-// behavior is not yet stable. See
-// https://github.com/rust-lang/rfcs/blob/master/text/1733-trait-alias.md.
+/// A special empty token for convenience.
+const EMPTY_TOKEN: LazyCell<Token> = LazyCell::new(|| Token {
+    value: [].into(),
+    terminal: None,
+    start_pos: 0,
+    end_pos: 0,
+    line: 1,
+    end_line: 1,
+    column: 1,
+    end_column: 1,
+});
 
 impl Parser {
     /// Construct a new parser from a grammar.
     pub fn new(grammar: &Grammar) -> Result<Parser, ()> {
-        let (action_table, goto_table) = tables(grammar.clone());
+        let (action_table, goto_table) = LRTables::new(grammar).tables();
         Ok(Parser {
             action_table,
             goto_table,

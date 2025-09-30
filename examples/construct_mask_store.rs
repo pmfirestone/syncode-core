@@ -38,12 +38,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // ser::to_writer(cache, &mask_store);
 
     let candidate = r#"{
-  "basics": {
-    "name": "Preston Firestone",
-    "label": "Programmer",
-    "image": "",
-    "email": "pf8@illinois.edu",
-    "phone": "+1 (224) 688-2924","#;
+    "basics": {
+      "name": "Preston Firestone",
+      "label": "Programmer",
+      "image": "",
+      "email": "pf8@illinois.edu",
+      "phone": "+1 (224) 688-2924","#;
 
     let tokens = tokenizer.encode(candidate, false);
 

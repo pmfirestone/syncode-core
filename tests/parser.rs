@@ -1,6 +1,31 @@
+#![feature(test)]
+extern crate test;
 use std::collections::HashSet;
+use std::fs;
 use syncode_core::grammar::EBNFParser;
 use syncode_core::types::{Lexer, Parser};
+
+#[bench]
+fn build_json_parser(b: &mut test::Bencher) {
+    let Ok(grammar) =
+        EBNFParser::new(&fs::read_to_string("grammars/json.lark").unwrap(), "start").parse()
+    else {
+        panic!()
+    };
+
+    b.iter(|| Parser::new(&grammar));
+}
+
+// #[bench]
+// fn build_go_parser(b: &mut test::Bencher) {
+//     let Ok(grammar) =
+//         EBNFParser::new(&fs::read_to_string("grammars/go.lark").unwrap(), "start").parse()
+//     else {
+//         panic!()
+//     };
+
+//     b.iter(|| Parser::new(&grammar));
+// }
 
 #[test]
 fn parse_simple_grammar() {
@@ -68,26 +93,16 @@ fn parse_json() {
     // eprintln!("Action table: {:#?}", parser.action_table);
     // eprintln!("Goto table: {:#?}", parser.goto_table);
 
-    let Ok((tokens, remainder)) = lexer.lex(
-        r##"{
-  "basics": {
-    "name": "Preston Firestone",
-    "label": "Programmer",
-    "image": "",
-    "email": "pf8@illinois.edu",
-    "phone": "+1 (224) 688-2924",
-    "summary": "Master's Student in Computer Science","##
-            .as_bytes(),
-    ) else {
+    let Ok((tokens, remainder)) = lexer.lex(r##"{"##.as_bytes()) else {
         panic!()
     };
 
     // eprintln!("{:#?}", tokens);
     // eprintln!("{:#?}", remainder);
 
-    let Ok(accept_sequences) = parser.parse(tokens, remainder) else {
+    let Ok(accept_sequences) = parser.parse(&tokens, &remainder) else {
         panic!()
     };
 
-    eprintln!("{:#?}", accept_sequences);
+    // eprintln!("{:#?}", accept_sequences);
 }
