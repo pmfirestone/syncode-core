@@ -81,7 +81,7 @@ impl LRTables {
         // eprintln!("symbol: {symbol}");
         for terminal in &self.grammar.terminals {
             // eprintln!("{terminal}");
-            if *symbol == terminal.name {
+            if *symbol == *terminal.name {
                 return true;
             }
         }

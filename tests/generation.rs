@@ -5,11 +5,11 @@ use rayon::prelude::*;
 use std::fs;
 use syncode_core::bytes::restore_bytes;
 use syncode_core::grammar::EBNFParser;
+use syncode_core::grammar::Grammar;
+use syncode_core::lexer::Lexer;
 use syncode_core::mask::{dfa_mask_store, grammar_mask};
 use syncode_core::mask_store;
 use syncode_core::parser::Parser;
-use syncode_core::lexer::Lexer;
-use syncode_core::grammar::Grammar;
 use syncode_core::production::Production;
 use syncode_core::terminal::Terminal;
 use tokenizers::Tokenizer;
@@ -24,7 +24,7 @@ fn build_mask_store_json(b: &mut test::Bencher) {
     let tokens: Vec<&String> = vocab.keys().collect();
     let byte_tokens: Vec<Vec<u8>> = tokens.into_par_iter().map(|t| restore_bytes(t)).collect();
 
-    let Ok(grammar) = EBNFParser::new(&fs::read_to_string(grammar_file).unwrap(), "start").parse()
+    let Ok(grammar) = EBNFParser::new(&fs::read_to_string(grammar_file).unwrap(), "json").parse()
     else {
         panic!()
     };
@@ -67,7 +67,7 @@ fn generate_json() {
         panic!()
     };
 
-    let Ok(grammar) = EBNFParser::new(&fs::read_to_string(grammar_file).unwrap(), "start").parse()
+    let Ok(grammar) = EBNFParser::new(&fs::read_to_string(grammar_file).unwrap(), "json").parse()
     else {
         panic!()
     };
@@ -217,9 +217,9 @@ fn test_dfa_mask_store() {
     assert_eq!(
         store
             .get(&(
-                terminal.name,
+                terminal.name.to_string(),
                 starting_state,
-                vec![Terminal::new("L_PAREN", r"\(", 0).name,]
+                vec![Terminal::new("L_PAREN", r"\(", 0).name.to_string(),]
             ))
             .unwrap(),
         &vec![true, false, false, false, true, false],

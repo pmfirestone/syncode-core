@@ -12,9 +12,9 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct Terminal {
     /// The name of this terminal in the grammar.
-    pub name: String,
+    pub name: Arc<String>,
     /// The regex describing this terminal.
-    pub pattern: String,
+    pub pattern: Arc<String>,
     /// The DFA that matches this terminal.
     pub dfa: Arc<dense::DFA<Vec<u32>>>,
     /// This terminal's priority in lexing.
@@ -31,8 +31,8 @@ impl Terminal {
             )
         };
         Terminal {
-            name: name.into(),
-            pattern: pattern.into(),
+            name: name.to_string().into(),
+            pattern: pattern.to_string().into(),
             dfa: dfa.into(),
             priority,
         }

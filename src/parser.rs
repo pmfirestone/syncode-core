@@ -2,14 +2,14 @@
 //! The parser for SynCode. Takes in a lexed sequence of tokens and determines
 //! the accept sequences that could follow.
 
-use std::cell::LazyCell;
+
 use std::collections::HashSet;
 use std::fmt;
 
 use crate::grammar::Grammar;
 use crate::table::{Action, ActionTable, GotoTable, LRTables};
 use crate::terminal::Terminal;
-use crate::token::Token;
+use crate::token::{Token, EMPTY_TOKEN};
 
 /// The Parser with its tables.
 ///
@@ -32,7 +32,7 @@ impl Grammar {
     /// Find the terminal of this name.
     pub fn terminal_from_name(&self, name: &String) -> Option<Terminal> {
         for terminal in &self.terminals {
-            if terminal.name == *name {
+            if *terminal.name == *name {
                 return Some(terminal.clone());
             }
         }
@@ -40,17 +40,6 @@ impl Grammar {
     }
 }
 
-/// A special empty token for convenience.
-const EMPTY_TOKEN: LazyCell<Token> = LazyCell::new(|| Token {
-    value: [].into(),
-    terminal: None,
-    start_pos: 0,
-    end_pos: 0,
-    line: 1,
-    end_line: 1,
-    column: 1,
-    end_column: 1,
-});
 
 impl Parser {
     /// Construct a new parser from a grammar.
@@ -239,7 +228,7 @@ impl Parser {
             // Case 1: the remainder is the last lexical token.
             let remainder_type = last_token.clone().terminal.unwrap().name;
             for terminal in a1 {
-                accept_sequences.insert(vec![remainder_type.clone(), terminal]);
+                accept_sequences.insert(vec![remainder_type.to_string(), terminal]);
             }
             for terminal in a0 {
                 accept_sequences.insert(vec![terminal]);
@@ -297,11 +286,11 @@ impl fmt::Display for ParserError {
             } => {
                 write!(
                     f,
-                    "Unexpected token '{:?}' (type: {}) at line {}, column {}. Expected one of: {:?}",
+                    "Unexpected token '{:?}' (type: {}) at span {}--{}. Expected one of: {:?}",
                     token.value,
                     token.terminal.clone().unwrap().name,
-                    token.line,
-                    token.column,
+		    token.start_pos,
+		    token.end_pos,
                     expected
                 )
             }
@@ -351,8 +340,10 @@ impl fmt::Display for ParserError {
 mod tests {
     extern crate test;
     use std::collections::{HashMap, HashSet};
+    use std::fs;
 
     use super::*;
+    use crate::grammar::EBNFParser;
     use crate::lexer::Lexer;
     use crate::production::Production;
     // Terminal definitions to be used throughout tests. Commented out ones may
@@ -361,53 +352,13 @@ mod tests {
         Terminal::new("WORD", r"[a-zA-Z_]\w*", 2)
     }
 
-    // fn string() -> Terminal {
-    //     Terminal::new("STRING", r#"("""[^"]*"""|'''[^']*''')"#, 2)
-    // }
-
     fn space() -> Terminal {
         Terminal::new("SPACE", "\\s+", 0)
     }
 
-    // fn equals() -> Terminal {
-    //     Terminal::new("EQUALS", "=", 1)
-    // }
-
-    // fn dot() -> Terminal {
-    //     Terminal::new("DOT", r"\.", 1)
-    // }
-
     fn dec_number() -> Terminal {
         Terminal::new("DEC_NUMBER", r"0|[1-9]\d*", 1)
     }
-
-    // fn oct_number() -> Terminal {
-    //     Terminal::new("OCT_NUMBER", r"(?i)0o[0-7]+", 1)
-    // }
-
-    // fn bin_number() -> Terminal {
-    //     Terminal::new("BIN_NUMBER", r"(?i)0b[0-1]+", 1)
-    // }
-
-    // fn hex_number() -> Terminal {
-    //     Terminal::new("HEX_NUMBER", r"(?i)0x[\da-f]+", 1)
-    // }
-
-    // fn float_number() -> Terminal {
-    //     Terminal::new(
-    //         "FLOAT_NUMBER",
-    //         r"((\d+\.\d*|\.\d+)(e[-+]?\d+)?|\d+(e[-+]?\d+))",
-    //         1,
-    //     )
-    // }
-
-    // fn semicolon() -> Terminal {
-    //     Terminal::new("SEMICOLON", ";", 0)
-    // }
-
-    // fn newline() -> Terminal {
-    //     Terminal::new("NEWLINE", r"\n", 1)
-    // }
 
     fn star() -> Terminal {
         Terminal::new("STAR", r"\*", 1)
@@ -569,10 +520,6 @@ mod tests {
                 terminal: Some(dec_number()),
                 start_pos: 8,
                 end_pos: 9,
-                line: 1,
-                end_line: 1,
-                column: 9,
-                end_column: 10
             },
             remainder
         );
@@ -618,5 +565,95 @@ mod tests {
             parser.next_terminals(&"L_PAREN".to_string()),
             vec!["R_PAREN".to_string()]
         );
+    }
+
+    #[bench]
+    fn parse_json(b: &mut test::Bencher) {
+        let Ok(grammar) =
+            EBNFParser::new(&fs::read_to_string("grammars/json.lark").unwrap(), "json").parse()
+        else {
+            panic!()
+        };
+
+        let Ok(parser) = Parser::new(&grammar) else {
+            panic!()
+        };
+
+        let Ok(lexer) = Lexer::new(&grammar.terminals, &grammar.ignore_terminals) else {
+            panic!()
+        };
+
+        let text = r#"{
+    "glossary": {
+        "title": "example glossary",
+		"GlossDiv": {
+            "title": "S",
+			"GlossList": {
+                "GlossEntry": {
+                    "ID": "SGML",
+					"SortAs": "SGML",
+					"GlossTerm": "Standard Generalized Markup Language",
+					"Acronym": "SGML",
+					"Abbrev": "ISO 8879:1986",
+					"GlossDef": {
+                        "para": "A meta-markup language, used to create markup languages such as DocBook.",
+						"GlossSeeAlso": ["GML", "XML"]
+                    },
+					"GlossSee": "markup"
+                }
+            }
+        }
+    }
+}"#;
+
+        let Ok((accept_sequences, remainder)) = lexer.lex(text.as_bytes()) else {
+            panic!()
+        };
+
+        b.iter(|| parser.parse(&accept_sequences, &remainder));
+    }
+
+    #[test]
+    fn parse_not_json() {
+        let Ok(grammar) =
+            EBNFParser::new(&fs::read_to_string("grammars/json.lark").unwrap(), "json").parse()
+        else {
+            panic!()
+        };
+
+        let Ok(parser) = Parser::new(&grammar) else {
+            panic!()
+        };
+
+        let Ok(lexer) = Lexer::new(&grammar.terminals, &grammar.ignore_terminals) else {
+            panic!()
+        };
+
+        let text = r#"{"menu": {
+  "id": "file",
+  "value": "File",
+  "popup": {
+    "menuitem": [
+      {"value": "New", "onclick": "CreateNewDoc()"},
+      {"value": "Open", "onclick": "OpenDoc()",
+      {"value": "Close", "onclick": "CloseDoc()"}
+    ]
+  }
+}}"#;
+
+        let Ok((tokens, remainder)) = lexer.lex(text.as_bytes()) else {
+            panic!()
+        };
+
+        let mut state_stack = vec![parser.start_state];
+
+        for token in tokens {
+            let Ok(new_states) = parser.next(&token.terminal.unwrap().name, state_stack) else {
+                return;
+            };
+            state_stack = new_states;
+        }
+
+        panic!("Shouldn't have been ok.")
     }
 }

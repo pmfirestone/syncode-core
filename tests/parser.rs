@@ -8,12 +8,27 @@ use syncode_core::{lexer::Lexer, parser::Parser};
 #[bench]
 fn build_json_parser(b: &mut test::Bencher) {
     let Ok(grammar) =
-        EBNFParser::new(&fs::read_to_string("grammars/json.lark").unwrap(), "start").parse()
+        EBNFParser::new(&fs::read_to_string("grammars/json.lark").unwrap(), "json").parse()
     else {
         panic!()
     };
 
     b.iter(|| Parser::new(&grammar));
+}
+
+#[bench]
+fn parse_json(b: &mut test::Bencher) {
+    let text = fs::read_to_string("tests/large-file.json").unwrap();
+    let grammar = EBNFParser::new(&fs::read_to_string("grammars/json.lark").unwrap(), "json")
+        .parse()
+        .unwrap();
+
+    let parser = Parser::new(&grammar).unwrap();
+
+    let lexer = Lexer::new(&grammar.terminals, &grammar.ignore_terminals).unwrap();
+    let (tokens, remainder) = lexer.lex(text.as_bytes()).unwrap();
+
+    b.iter(|| parser.parse(&tokens, &remainder));
 }
 
 // #[bench]
@@ -64,45 +79,4 @@ fn parse_simple_grammar() {
         ]),
         accept_sequences
     );
-}
-
-#[test]
-fn parse_json() {
-    use std::fs;
-
-    let Ok(grammar) = &EBNFParser::new(
-        &fs::read_to_string("./grammars/json.lark").unwrap(),
-        "start",
-    )
-    .parse() else {
-        panic!()
-    };
-
-    // eprintln!("Grammar: {:#?}", grammar);
-
-    let Ok(parser) = Parser::new(&grammar) else {
-        panic!()
-    };
-
-    let Ok(lexer) = Lexer::new(&grammar.terminals, &grammar.ignore_terminals) else {
-        panic!()
-    };
-
-    // eprintln!("{:#?}", grammar.terminals);
-
-    // eprintln!("Action table: {:#?}", parser.action_table);
-    // eprintln!("Goto table: {:#?}", parser.goto_table);
-
-    let Ok((tokens, remainder)) = lexer.lex(r##"{"##.as_bytes()) else {
-        panic!()
-    };
-
-    // eprintln!("{:#?}", tokens);
-    // eprintln!("{:#?}", remainder);
-
-    let Ok(accept_sequences) = parser.parse(&tokens, &remainder) else {
-        panic!()
-    };
-
-    // eprintln!("{:#?}", accept_sequences);
 }

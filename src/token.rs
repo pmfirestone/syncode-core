@@ -1,5 +1,6 @@
 use crate::terminal::Terminal;
 use std::sync::Arc;
+use std::cell::LazyCell;
 
 /// A lexical token, what the lexer breaks the input into.
 #[derive(Clone, Debug, PartialEq)]
@@ -14,12 +15,13 @@ pub struct Token {
     pub start_pos: usize,
     /// Where in the input the token ends.
     pub end_pos: usize,
-    /// The line of the input the token begins on.
-    pub line: usize,
-    /// The line of the input the token ends on.
-    pub end_line: usize,
-    /// The column of the input the token begins on.
-    pub column: usize,
-    /// The column of the input the token ends on.
-    pub end_column: usize,
 }
+
+
+/// A special empty token for convenience.
+pub const EMPTY_TOKEN: LazyCell<Token> = LazyCell::new(|| Token {
+    value: [].into(),
+    terminal: None,
+    start_pos: 0,
+    end_pos: 0,
+});

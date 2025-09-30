@@ -21,6 +21,8 @@ pub struct Lexer {
     pub dfa: dense::DFA<Vec<u32>>,
     /// Maps DFA match pattern to the TerminalDef it represents.
     pub index_to_type: HashMap<usize, Terminal>,
+    /// The text we are currently lexing.
+    cur_text: Vec<u8>,
 }
 
 /// A type to describe errors that can arise in lexing.
@@ -64,7 +66,7 @@ impl Lexer {
             }
         }
 
-        // Sort terminals by priority (highest first)
+        // Sort terminals by priority (highest first).
         let mut sorted_terminals = terminals.clone();
         sorted_terminals.sort_by(|a, b| {
             let prio_cmp = b.priority.cmp(&a.priority);
@@ -72,26 +74,27 @@ impl Lexer {
                 return prio_cmp;
             }
 
-            // If priorities are equal, sort by pattern length (descending)
+            // If priorities are equal, sort by pattern length (descending).
             b.pattern.len().cmp(&a.pattern.len())
         });
 
-        // Create patterns for the DFA
+        // Create patterns for the DFA.
         let mut patterns = Vec::with_capacity(sorted_terminals.len());
 
         // Process each terminal
         for (i, terminal) in sorted_terminals.iter().enumerate() {
             index_to_type.insert(i, terminal.clone());
-            patterns.push(terminal.pattern.clone());
+	    let pattern = terminal.pattern.to_string();
+            patterns.push(pattern);
         }
 
-        // Build the DFA
+        // Build the DFA.
         let dfa = dense::Builder::new()
             .configure(
                 dense::Config::new()
-                    .minimize(true) // Minimize the DFA for better performance
+                    .minimize(true) // Minimize the DFA for better performance. ?
                     .start_kind(StartKind::Anchored),
-            ) // Only match from the start of the input
+            ) // Only match from the start of the input.
             .build_many(&patterns)
             .map_err(|e| LexError::RegexError(format!("Failed to build DFA: {}", e)))?;
 
@@ -101,13 +104,14 @@ impl Lexer {
             newline_types,
             dfa,
             index_to_type,
+            cur_text: vec![],
         })
     }
 
     /// Get the Terminal object of this name, if there is one.
     pub fn get_terminal(&self, name: &String) -> Result<Terminal, ()> {
         for terminal in &self.terminals {
-            if terminal.name == *name {
+            if *terminal.name == *name {
                 return Ok(terminal.clone());
             }
         }
@@ -118,11 +122,13 @@ impl Lexer {
     /// return it along with the type of terminal that it is.
     ///
     /// Look for the longest possible match.
-    pub fn match_token(&self, text: Box<[u8]>, pos: usize) -> Option<(Box<[u8]>, &Terminal)> {
+    pub fn match_token(&self, text: &Vec<u8>, pos: usize) -> Option<Token> {
         if pos >= text.len() {
             return None;
         }
 
+	let mut cur_pos = pos;
+	
         let rest = &text[pos..];
 
         let config = start::Config::new().anchored(Anchored::Yes);
@@ -132,43 +138,18 @@ impl Lexer {
             return None;
         }
 
-        // Keep track of the best match so far
-        let mut best_match: Option<(usize, usize)> = None; // (pattern_idx, length)
-        let mut current_len = 0;
+	// Algorithm after Park et al. (2025), p. 4 https://arxiv.org/abs/2502.05111.
+	for byte in rest {
+	    // The input is processed character-by-character by transitioning
+	    // through the FSA’s states.
+	    let new_state = self.dfa.next_state(state, *byte);
+	    if self.dfa.is_dead_state(new_state) || self.dfa.is_quit_state(new_state) {
+		// When no valid transition exists for the next character c, the lexer checks whether the current state corresponds to a valid language token.
+		if self.dfa.is_match_state(state) {
 
-        // Walk through the DFA state by state
-        for &byte in rest {
-            state = self.dfa.next_state(state, byte);
-
-            if self.dfa.is_dead_state(state) {
-                break;
-            }
-
-            let eoi_state = self.dfa.next_eoi_state(state);
-            current_len += 1;
-
-            if self.dfa.is_match_state(eoi_state) {
-                let pattern_idx = self.dfa.match_pattern(eoi_state, 0).as_usize();
-
-                match best_match {
-                    None => {
-                        best_match = Some((pattern_idx, current_len));
-                    }
-                    Some((_, len)) if current_len > len => {
-                        // Prefer longer matches
-                        best_match = Some((pattern_idx, current_len));
-                    }
-                    _ => {} // Keep existing best match
-                }
-            }
-        }
-
-        // Return the best match found as string slices
-        if let Some((pattern_idx, match_len)) = best_match {
-            if let Some(terminal) = self.index_to_type.get(&pattern_idx) {
-                return Some((rest[..match_len].into(), terminal));
-            }
-        }
+		}
+	    }
+	}
 
         None
     }
@@ -185,36 +166,17 @@ impl Lexer {
     // in the code similar to that in the paper.
     fn next_token(
         &self,
-        text: &[u8],
+        text: &Vec<u8>,
         mut pos: usize,
-        mut line: usize,
-        mut column: usize,
     ) -> Result<(Token, bool), LexError> {
         loop {
             // Try to match next token
-            if let Some((value, terminal)) = self.match_token(text.into(), pos) {
+            if let Some((value, terminal)) = self.match_token(text, pos) {
                 let ignored = self.ignore_terminals.contains(&terminal.name);
 
-                // If this token is ignored, update position and continue the loop
+
                 if ignored {
-                    let contains_newline = self.newline_types.contains(terminal);
-
-                    // Update line and column information
-                    if contains_newline {
-                        // Calculate new line and column for tokens with newlines
-                        for &b in &value {
-                            if b == b'\n' {
-                                line += 1;
-                                column = 1;
-                            } else {
-                                column += 1;
-                            }
-                        }
-                    } else {
-                        column += value.len();
-                    }
-
-                    // Move position forward and continue the loop
+                    // If this token is ignored, update position and continue the loop.
                     pos += value.len();
                     continue;
                 }
@@ -222,41 +184,15 @@ impl Lexer {
                 // For non-ignored tokens, create and return the token
                 let start_pos = pos;
                 let end_pos = start_pos + value.len();
-                let start_line = line;
-                let start_column = column;
 
                 // Calculate end line and column
-                let contains_newline = self.newline_types.contains(terminal);
-                let (end_line, end_column) = if contains_newline {
-                    // Calculate for tokens with newlines
-                    let mut current_line = line;
-                    let mut current_column = column;
-
-                    for &b in &value {
-                        if b == b'\n' {
-                            current_line += 1;
-                            current_column = 1;
-                        } else {
-                            current_column += 1;
-                        }
-                    }
-
-                    (current_line, current_column)
-                } else {
-                    // Simple calculation for tokens without newlines
-                    (line, column + value.len())
-                };
 
                 return Ok((
                     Token {
                         value: value.into(),
                         terminal: Some(terminal.clone()),
-                        start_pos,
-                        end_pos,
-                        line: start_line,
-                        column: start_column,
-                        end_line,
-                        end_column,
+			start_pos,
+			end_pos
                     },
                     false,
                 ));
@@ -269,18 +205,13 @@ impl Lexer {
                 // token that may someday become valid or a truly irredeemable
                 // error: this will be detected when we attempt partial matches
                 // in the mask store.
-                let value = &text[pos..];
+                let value = &self.cur_text[pos..];
                 return Ok((
                     Token {
                         value: value.into(),
                         terminal: None,
                         start_pos: pos,
-                        end_pos: text.len(),
-                        line,
-                        column,
-                        // TODO: How to compute these values?
-                        end_line: usize::MAX,
-                        end_column: usize::MAX,
+                        end_pos: self.cur_text.len(),
                     },
                     true,
                 ));
@@ -295,18 +226,16 @@ impl Lexer {
     /// unlexable suffix, in the case where the end of the input could not be
     /// lexed.
     pub fn lex(&self, text: &[u8]) -> Result<(Vec<Token>, Token), LexError> {
-        // Pre-allocate a reasonably-sized vector based on estimated token density
-        let estimated_token_count = text.len() / 8;
-        let mut tokens = Vec::with_capacity(estimated_token_count);
-
+        let mut tokens = Vec::new();
         let mut remainder: Token;
 
         let mut pos = 0;
-        let mut line = 1;
-        let mut column = 1;
+
+        // Move from the stack to the heap.
+        let bytes = Vec::from(text);
 
         loop {
-            let (new_token, is_remainder) = self.next_token(text, pos, line, column)?;
+            let (new_token, is_remainder) = self.next_token(&bytes, pos)?;
 
             if is_remainder {
                 // We should quit early, because we've seen all there is to see.
@@ -315,8 +244,6 @@ impl Lexer {
 
             // Otherwise, continue counting forward to get new tokens.
             pos = new_token.end_pos;
-            line = new_token.end_line;
-            column = new_token.end_column;
 
             tokens.push(new_token.clone());
 
@@ -455,10 +382,6 @@ mod tests {
                 terminal: Some(dec_number()),
                 start_pos: 8,
                 end_pos: 9,
-                line: 1,
-                end_line: 1,
-                column: 9,
-                end_column: 10
             },
             remainder
         );
@@ -638,10 +561,6 @@ mod tests {
                 terminal: Some(dec_number()),
                 start_pos: 0,
                 end_pos: 3,
-                line: 1,
-                column: 1,
-                end_line: 1,
-                end_column: 4
             }
         );
 
@@ -652,10 +571,6 @@ mod tests {
                 terminal: Some(word()),
                 start_pos: 4,
                 end_pos: 7,
-                line: 1,
-                column: 5,
-                end_line: 1,
-                end_column: 8
             }
         );
 
@@ -696,39 +611,6 @@ mod tests {
             let (_, remainder) = lexer.lex(input).unwrap();
             assert_eq!(&*remainder.value, expected);
         }
-    }
-
-    #[test]
-    fn multiline_tracking() {
-        let terminals = vec![word(), newline(), space()];
-        let ignore_terminals = vec!["SPACE".to_string()];
-
-        let Ok(lexer) = Lexer::new(&terminals, &ignore_terminals) else {
-            panic!()
-        };
-
-        // Test multiline text
-        let text = "first\nsecond\nthird".as_bytes();
-
-        let tokens = lexer.lex(text).unwrap();
-
-        // Check line numbers
-        assert_eq!(tokens.0.len(), 5); // 3 words + 2 newlines
-
-        // First word should be on line 1
-        assert_eq!(tokens.0[0].line, 1);
-        assert_eq!(tokens.0[0].value, "first".as_bytes().into());
-
-        // After first newline, we should be on line 2
-        assert_eq!(tokens.0[2].line, 2);
-        assert_eq!(tokens.0[2].value, "second".as_bytes().into());
-
-        // After second newline, we should be on line 3
-        assert_eq!(tokens.0[4].line, 3);
-        assert_eq!(tokens.0[4].value, "third".as_bytes().into());
-
-        // The remainder should be the last token seen.
-        assert_eq!(tokens.1, tokens.0[4]);
     }
 
     #[bench]

@@ -166,17 +166,17 @@ pub fn dfa_mask_store(
         let accept_sequence_terminals = vec![];
 
         store.insert(
-            (terminal.name.clone(), *state_id, accept_sequence_names),
+            (terminal.name.to_string(), *state_id, accept_sequence_names),
             dfa_mask(dfa, state_id, &accept_sequence_terminals, &model_vocabulary),
         );
 
         for next_terminal in lexical_terminals {
             // Lookahead of one terminal.
-            let accept_sequence_names = vec![next_terminal.name.clone()];
+            let accept_sequence_names = vec![next_terminal.name.to_string()];
             let accept_sequence_terminals = vec![next_terminal.clone()];
 
             store.insert(
-                (terminal.name.clone(), *state_id, accept_sequence_names),
+                (terminal.name.to_string(), *state_id, accept_sequence_names),
                 dfa_mask(dfa, state_id, &accept_sequence_terminals, &model_vocabulary),
             );
 
@@ -222,7 +222,7 @@ pub fn grammar_mask(
                 // Get the relevant mask out of the store.
                 mask_store
                     .get(&(
-                        first_terminal.name.clone(),
+                        first_terminal.name.to_string(),
                         end_state,
                         accept_sequence[1..].to_vec(),
                     ))
