@@ -1,0 +1,56 @@
+// Adapted from https://www.crockford.com/mckeeman.html. With regular expressions on right hand side.
+
+json: element
+
+value: object
+     | array
+     | string
+     | number
+     | "true"
+     | "false"
+     | "null"
+
+object: "{" ws* "}"
+      | "{" member ("," member)* "}"
+
+member: ws* string ws* ":" element
+
+array: "[" ws* "]"
+     | "[" element ("," element)* "]"
+
+element: ws* value ws*
+
+string: /"/ character* /"/
+
+character: /[\x{20} -\x{10FFFF}--["\\]]/
+         | "\" escape
+
+escape: /"/
+      | "\"
+      | "/"
+      | "b"
+      | "f"
+      | "n"
+      | "r"
+      | "t"
+      | "u" hex hex hex hex
+
+hex: digit
+   | "A".."F"
+   | "a".."f"
+
+number:  integer fraction? exponent?
+
+integer: "-"? digit
+       | "-"? "1".."9" digit+
+
+digit: "0".."9"
+
+fraction: "." digit+
+
+exponent: ("E"|"e") ("+"|"-")? digit+
+
+ws: /\x{0020}/
+  | /\x{000A}/
+  | /\x{000D}/
+  | /\x{0009}/

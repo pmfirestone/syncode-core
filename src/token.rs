@@ -1,6 +1,6 @@
 use crate::terminal::Terminal;
-use std::sync::Arc;
 use std::cell::LazyCell;
+use std::sync::Arc;
 
 /// A lexical token, what the lexer breaks the input into.
 #[derive(Clone, Debug, PartialEq)]
@@ -16,7 +16,6 @@ pub struct Token {
     /// Where in the input the token ends.
     pub end_pos: usize,
 }
-
 
 /// A special empty token for convenience.
 pub const EMPTY_TOKEN: LazyCell<Token> = LazyCell::new(|| Token {

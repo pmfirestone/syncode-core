@@ -76,24 +76,12 @@ impl LRTables {
         res
     }
 
-    /// Check whether a given symbol is a terminal in this grammar.
-    fn is_terminal(&self, symbol: &String) -> bool {
-        // eprintln!("symbol: {symbol}");
-        for terminal in &self.grammar.terminals {
-            // eprintln!("{terminal}");
-            if *symbol == *terminal.name {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /// Construct the first set of a given symbol.
     ///
     /// The algorithm comes from sec. 4.4.2 of the Dragon Book 2e, p. 221, with
     /// some modifications to behave well for left-recursive grammars.
     fn symbol_first(&self, symbol: &String) -> HashSet<String> {
-        if self.is_terminal(symbol) {
+        if self.grammar.is_terminal(symbol) {
             // eprintln!("terminal: {symbol}");
             // If symbol is a terminal, then first(symbol) = {symbol}.
             return HashSet::from([symbol.clone()]);

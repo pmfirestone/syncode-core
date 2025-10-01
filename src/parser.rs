@@ -2,14 +2,13 @@
 //! The parser for SynCode. Takes in a lexed sequence of tokens and determines
 //! the accept sequences that could follow.
 
-
 use std::collections::HashSet;
 use std::fmt;
 
 use crate::grammar::Grammar;
 use crate::table::{Action, ActionTable, GotoTable, LRTables};
 use crate::terminal::Terminal;
-use crate::token::{Token, EMPTY_TOKEN};
+use crate::token::{EMPTY_TOKEN, Token};
 
 /// The Parser with its tables.
 ///
@@ -39,7 +38,6 @@ impl Grammar {
         None
     }
 }
-
 
 impl Parser {
     /// Construct a new parser from a grammar.
@@ -289,8 +287,8 @@ impl fmt::Display for ParserError {
                     "Unexpected token '{:?}' (type: {}) at span {}--{}. Expected one of: {:?}",
                     token.value,
                     token.terminal.clone().unwrap().name,
-		    token.start_pos,
-		    token.end_pos,
+                    token.start_pos,
+                    token.end_pos,
                     expected
                 )
             }

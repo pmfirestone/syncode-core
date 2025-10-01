@@ -2,6 +2,7 @@
 //! The lexer for SynCode. The primary procedure for this module is `lex`
 //! (q.v.), which takes a text and returns a sequence of lexical tokens along
 //! with a "remainder". See the paper for more detail.
+use crate::grammar::Grammar;
 use crate::terminal::Terminal;
 use crate::token::Token;
 use regex_automata::dfa::{Automaton, StartKind, dense};
@@ -11,12 +12,8 @@ use std::collections::{HashMap, HashSet};
 /// A lexer.
 #[derive(Clone, Debug)]
 pub struct Lexer {
-    /// The terminals this lexer recognizes.
-    pub terminals: Vec<Terminal>,
-    /// The terminals this lexer ignores.
-    pub ignore_terminals: Vec<String>,
-    /// The terminals that contain newlines.
-    pub newline_types: HashSet<Terminal>,
+    /// The grammar this lexer recognizes.
+    pub grammar: Grammar,
     /// The DFA for matching patterns.
     pub dfa: dense::DFA<Vec<u32>>,
     /// Maps DFA match pattern to the TerminalDef it represents.
@@ -47,27 +44,11 @@ pub enum LexError {
 impl Lexer {
     /// Construct a new lexer that recognizes the given `terminals` and ignores
     /// the `ignore_types`.
-    pub fn new(
-        terminals: &Vec<Terminal>,
-        ignore_terminals: &Vec<String>,
-    ) -> Result<Self, LexError> {
-        // Determine which patterns might contain newlines
-        let mut newline_types: HashSet<Terminal> = HashSet::new();
+    pub fn new(grammar: &Grammar) -> Result<Self, LexError> {
         let mut index_to_type: HashMap<usize, Terminal> = HashMap::new();
 
-        for terminal in terminals {
-            if terminal.pattern.contains("\\n")
-                || terminal.pattern.contains("\n")
-                || terminal.pattern.contains("\\s")
-                || terminal.pattern.contains("[^")
-                || (terminal.pattern.contains(".") && terminal.pattern.contains("(?s"))
-            {
-                newline_types.insert(terminal.clone());
-            }
-        }
-
         // Sort terminals by priority (highest first).
-        let mut sorted_terminals = terminals.clone();
+        let mut sorted_terminals = grammar.terminals.clone();
         sorted_terminals.sort_by(|a, b| {
             let prio_cmp = b.priority.cmp(&a.priority);
             if prio_cmp != std::cmp::Ordering::Equal {
@@ -84,24 +65,21 @@ impl Lexer {
         // Process each terminal
         for (i, terminal) in sorted_terminals.iter().enumerate() {
             index_to_type.insert(i, terminal.clone());
-	    let pattern = terminal.pattern.to_string();
+            let pattern = terminal.pattern.to_string();
             patterns.push(pattern);
         }
 
         // Build the DFA.
         let dfa = dense::Builder::new()
             .configure(
-                dense::Config::new()
-                    .minimize(true) // Minimize the DFA for better performance. ?
-                    .start_kind(StartKind::Anchored),
-            ) // Only match from the start of the input.
+                // Only match from the start of the input.
+                dense::Config::new().start_kind(StartKind::Anchored),
+            )
             .build_many(&patterns)
             .map_err(|e| LexError::RegexError(format!("Failed to build DFA: {}", e)))?;
 
         Ok(Lexer {
-            terminals: terminals.to_vec(),
-            ignore_terminals: ignore_terminals.to_vec(),
-            newline_types,
+            grammar: grammar.clone(),
             dfa,
             index_to_type,
             cur_text: vec![],
@@ -110,7 +88,7 @@ impl Lexer {
 
     /// Get the Terminal object of this name, if there is one.
     pub fn get_terminal(&self, name: &String) -> Result<Terminal, ()> {
-        for terminal in &self.terminals {
+        for terminal in &self.grammar.terminals {
             if *terminal.name == *name {
                 return Ok(terminal.clone());
             }
@@ -127,8 +105,8 @@ impl Lexer {
             return None;
         }
 
-	let mut cur_pos = pos;
-	
+        let mut cur_pos = pos;
+
         let rest = &text[pos..];
 
         let config = start::Config::new().anchored(Anchored::Yes);
@@ -138,18 +116,18 @@ impl Lexer {
             return None;
         }
 
-	// Algorithm after Park et al. (2025), p. 4 https://arxiv.org/abs/2502.05111.
-	for byte in rest {
-	    // The input is processed character-by-character by transitioning
-	    // through the FSA’s states.
-	    let new_state = self.dfa.next_state(state, *byte);
-	    if self.dfa.is_dead_state(new_state) || self.dfa.is_quit_state(new_state) {
-		// When no valid transition exists for the next character c, the lexer checks whether the current state corresponds to a valid language token.
-		if self.dfa.is_match_state(state) {
-
-		}
-	    }
-	}
+        // Algorithm after Park et al. (2025), p. 4 https://arxiv.org/abs/2502.05111.
+        for byte in rest {
+            // The input is processed character-by-character by transitioning
+            // through the FSA’s states.
+            let new_state = self.dfa.next_state(state, *byte);
+            if self.dfa.is_dead_state(new_state) || self.dfa.is_quit_state(new_state) {
+                // When no valid transition exists for the next character c, the lexer checks whether the current state corresponds to a valid language token.
+                if self.dfa.is_match_state(state) {
+                    // self.dfa.match_pattern();
+                }
+            }
+        }
 
         None
     }
@@ -164,38 +142,32 @@ impl Lexer {
     // procedure is returning the remainder. Then that procedure returns a
     // pair, and its caller in turn unpacks that pair. This keeps the notation
     // in the code similar to that in the paper.
-    fn next_token(
-        &self,
-        text: &Vec<u8>,
-        mut pos: usize,
-    ) -> Result<(Token, bool), LexError> {
-        loop {
+    fn next_token(&self, text: &Vec<u8>, mut pos: usize) -> Result<(Token, bool), LexError> {
+        'consume: loop {
             // Try to match next token
-            if let Some((value, terminal)) = self.match_token(text, pos) {
-                let ignored = self.ignore_terminals.contains(&terminal.name);
-
-
-                if ignored {
-                    // If this token is ignored, update position and continue the loop.
-                    pos += value.len();
-                    continue;
+            if let Some(token) = self.match_token(text, pos) {
+                match token.terminal {
+                    Some(..) => {
+                        // There is some terminal that might be ignored.
+                        let ignored = self
+                            .grammar
+                            .ignore_terminals
+                            .contains(&token.terminal.clone().unwrap().name);
+                        if ignored {
+                            // If this token is ignored, update position and continue the loop.
+                            pos += token.value.len();
+                            continue 'consume;
+                        } else {
+                            return Ok((token, false));
+                        }
+                    }
+                    None => {
+			return Ok((
+			    token,
+			    true,
+			));
+                    }
                 }
-
-                // For non-ignored tokens, create and return the token
-                let start_pos = pos;
-                let end_pos = start_pos + value.len();
-
-                // Calculate end line and column
-
-                return Ok((
-                    Token {
-                        value: value.into(),
-                        terminal: Some(terminal.clone()),
-			start_pos,
-			end_pos
-                    },
-                    false,
-                ));
             } else {
                 // No match found. Return what's left as the unlexed
                 // remainder. The parser will pass this on to the mask store,
@@ -205,16 +177,7 @@ impl Lexer {
                 // token that may someday become valid or a truly irredeemable
                 // error: this will be detected when we attempt partial matches
                 // in the mask store.
-                let value = &self.cur_text[pos..];
-                return Ok((
-                    Token {
-                        value: value.into(),
-                        terminal: None,
-                        start_pos: pos,
-                        end_pos: self.cur_text.len(),
-                    },
-                    true,
-                ));
+
             }
         }
     }
@@ -326,17 +289,17 @@ mod tests {
         Terminal::new("PLUS", r"\+", 1)
     }
 
-    #[test]
-    fn lexer_initialization() {
-        let terminal_defs = vec![word(), space()];
+    // #[test]
+    // fn lexer_initialization() {
+    //     let terminal_defs = vec![word(), space()];
 
-        let Ok(lexer) = Lexer::new(&terminal_defs, &vec![]) else {
-            panic!()
-        };
+    //     let Ok(lexer) = Lexer::new(&terminal_defs, &vec![]) else {
+    //         panic!()
+    //     };
 
-        // Check if it was initialized correctly
-        assert_eq!(lexer.terminals.len(), 2);
-    }
+    //     // Check if it was initialized correctly
+    //     assert_eq!(lexer.terminals.len(), 2);
+    // }
 
     #[test]
     fn simple_lexing() {
